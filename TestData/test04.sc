@@ -9,7 +9,7 @@ printArray(b[]);
 
 arrayClear(abc[]);
 start = arrayStart(abc[]);
-size = arrayCount(abc[]);
+size = arraySize(abc[]);
 print("start = ", start, " size = ", size, "\n");
 
 //  配列に加算関数
