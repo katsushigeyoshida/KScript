@@ -20,12 +20,18 @@
     public class Token
     {
         public static string[] comment = { "//", "/*", "*/" };
-        public static string[] conditionOperator = { "==", "!=", "<", ">", "<=", ">=" };
+        public static string[] conditionOperator = { 
+            "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!" 
+        };
         public static string[] multiOperators = { "++", "--", "+=", "-=", "*=", "/=", "^=" };
-        public static char[] operators = { '=', '+', '-', '*', '/', '%', '^', '!', '<', '>' };
+        public static char[] operators = { 
+            '=', '+', '-', '*', '/', '%', '^', '!', '<', '>', '&', '|'
+        };
         public static char[] delimiter = { '(', ')', '{', '}', '[', ']', ' ', ',', ';' };
         public static char[] skipChar = { ' ', '\t', '\r', '\n' };
-        public static string[] statement = { "let", "while", "if", "else", "for", "return", "print" };
+        public static string[] statement = {
+            "let", "while", "if", "else", "for", "return", "break", "continue", "print" 
+        };
 
         public string mValue;
         public TokenType mType;
