@@ -216,5 +216,112 @@
             }
             return str.Substring(sp, pos - sp);
         }
+
+        /// <summary>
+        /// 複数の括弧で囲まれた文字列の抽出(括弧含む)
+        /// "{..},{..},{...} ... "  →  "{...}", "{...}", "{...}"
+        /// </summary>
+        /// <param name="str">文字列</param>
+        /// <param name="n">開始位置</param>
+        /// <param name="bracket">括弧の種類</param>
+        /// <returns>抽出文字列リスト</returns>
+        public List<string> getBracketStringList(string str, int n, char bracket = '(')
+        {
+            List<string> strings = new List<string>();
+            //  Bracketの選択
+            int offset = Array.IndexOf(mBrackets, bracket);
+            if (offset < 0)
+                return strings;
+            //  Breacketの開始位置
+            int sp = str.IndexOf(mBrackets[offset], n);
+            if (sp < 0) return strings;
+            int pos = sp;
+            int count = 0;
+            while (0 <= pos && pos < str.Length) {
+                if (str[pos] == mBrackets[offset + 1]) count--;
+                else if (str[pos] == mBrackets[offset]) count++;
+                pos++;
+                if (count == 0) {
+                    strings.Add(str.Substring(sp, pos - sp));
+                    sp = str.IndexOf(mBrackets[offset], pos);
+                    pos = sp;
+                }
+            }
+            return strings;
+        }
+
+        /// <summary>
+        /// カンマで文字列を分割する
+        /// </summary>
+        /// <param name="str">文字列</param>
+        /// <returns>分割文字列リスト</returns>
+        public List<string> commaSplit(string str)
+        {
+            List<string> strings = new List<string>();
+            int n = 0;
+            int sp = 0;
+            while (n < str.Length) {
+                int offset = Array.IndexOf(mBrackets, str[n]);
+                if (0 <= offset) {
+                    if (str[n++] == '"') {
+                        while (n < str.Length && str[n] != '"') n++;
+                    } else {
+                        while (n < str.Length && str[n] != mBrackets[offset + 1]) {
+                            if (str[n++] == '"') {
+                                while (n < str.Length && str[n] != '"') n++;
+                            }
+                        }
+                    }
+                } else if (str[n] == ',') {
+                    strings.Add(str.Substring(sp, n - sp));
+                    sp = n + 1;
+                }
+                n++;
+            }
+            if (sp < n && n <= str.Length)
+                strings.Add(str.Substring(sp, n - sp));
+            return strings;
+        }
+
+        /// <summary>
+        /// 引数文字列の分解(args[a,b] → args,[,a,,,b,])
+        /// </summary>
+        /// <param name="args">引数文字列</param>
+        /// <returns>文字列リスト</returns>
+        public List<Token> splitArgList(string args)
+        {
+            List<Token> argList = new();
+            int n = 0;
+            string buf = "";
+            while (n < args.Length) {
+                if (args[n] == '[') {
+                    if (0 < buf.Length) {
+                        argList.Add(new Token(buf, TokenType.VARIABLE));
+                        buf = "";
+                    }
+                    argList.Add(new Token(args[n].ToString(), TokenType.DELIMITER));
+                } else if (args[n] == ']') {
+                    if (0 < buf.Length) {
+                        argList.Add(new Token(buf, TokenType.EXPRESS));
+                        buf = "";
+                    }
+                    argList.Add(new Token(args[n].ToString(), TokenType.DELIMITER));
+                } else if (args[n] == ',') {
+                    if (0 < buf.Length) {
+                        argList.Add(new Token(buf, TokenType.EXPRESS));
+                        buf = "";
+                    }
+                    argList.Add(new Token(args[n].ToString(), TokenType.DELIMITER));
+                } else if (args[n] == ' ' || args[n] == '\t') {
+                    //  読み飛ばし
+                } else {
+                    buf += args[n];
+                }
+                n++;
+            }
+            if (0 < buf.Length)
+                argList.Add(new Token(buf, TokenType.VARIABLE));
+            return argList;
+        }
     }
 }

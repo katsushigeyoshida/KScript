@@ -43,7 +43,7 @@ namespace KScript
     ///                     printStatement          print文 (print(var, var...);
     ///                         express                 数式処理
     ///                     returnStatement         return文 (return var/express;
-    ///                         getVariable             返数データの取得
+    ///                         cnvVariableList         引数をList形式に変換
     ///                         addVariable             返数データの登録
     ///                     funcStatement           関数処理
     ///                         innerFunc               内部関数
@@ -56,7 +56,7 @@ namespace KScript
     ///                 setFuncArg                      呼び出し側の引数を関数側の引数に変換
     ///                 getFuncArray                    配列を別の配列に移す(parseからCurrentへ)
     ///             expressFunc                     数式の関数処理
-    ///                 getVariable                     引数をList形式に変換
+    ///                 cnvVariableList                 引数をList形式に変換
     ///                 express                         数式処理
     ///                 mCalc.expression                数式処理の実行
     ///                 
@@ -84,18 +84,19 @@ namespace KScript
     ///                     cnvString                   文字列処理
     ///                         cnvArrayName                配列変数を変数に変換(array[a] → array[2])
     ///             cnvExpress                      数式処理
-    ///                  funcStatement
-    ///                  cnvExpress
-    ///                  YCalc.expression
+    ///                  funcStatement                  関数処理
+    ///                  cnvExpress                     数式処理
+    ///                  YCalc.expression               数式実処理
     ///             cnvString                       文字列処理
     ///                  cnvArrayName                   配列変数を変数に変換(array[a] → array[2])
-    ///             getVariable                     引数をList形式に変換("(a,b,c..)" → a,b,c... )
+    ///             cnvVariableList                 引数をList形式に変換("(a,b,c..)" → a,b,c... )
     ///             addVariable                     変数の登録(変数名と数値)
     ///             addFunction                     関数の登録
     ///              
     ///             追加関数
     ///             innerFunc                       内部関数
-    ///                 getArrayStart                   配列の開始位置(内部関数)
+    ///                 cnvArgData                      引数の数式を変換した引数にする
+    ///                 getArrayContain                 配列変数の存在を確認(内部関数)
     ///                     getArrayName                    引数の配列名のみを抽出(abc[] → abc)
     ///                 getArraySize                    配列のサイズの取得(内部関数)
     ///                     getArrayName                    引数の配列名のみを抽出(abc[] → abc)
@@ -243,6 +244,8 @@ namespace KScript
             if (tokens[1].mValue == "=") {
                 if (0 <= tokens[0].mValue.IndexOf("[]") && tokens[2].mType == TokenType.STATEMENT) {
                     setArrayData(tokens[0], tokens[2]);
+                } else if (0 <= tokens[0].mValue.IndexOf("[,]") && tokens[2].mType == TokenType.STATEMENT) {
+                    setArrayData2(tokens[0], tokens[2]);
                 } else {
                     Token buf = null;
                     if (tokens[2].mType == TokenType.STRING) {
@@ -341,14 +344,21 @@ namespace KScript
                 Console.WriteLine();
             } else if (tokens[1].mType == TokenType.EXPRESS) {
                 List<Token> tokenList = mLexer.tokenList(mLexer.stripBracketString(tokens[1].mValue));
-                if (tokenList == null || tokenList.Count == 0)
+                if (tokenList == null || tokenList.Count == 0) {
                     Console.WriteLine();
-                else
-                    for (int i = 0; i < tokenList.Count; i++)
-                        if (tokenList[i].mType != TokenType.DELIMITER)
-                            Console.Write(express(tokenList[i]).mValue);
+                } else {
+                    for (int i = 0; i < tokenList.Count; i++) {
+                        string buf = "";
+                        if (tokenList[i].mType == TokenType.FUNCTION) {
+                            buf = funcStatement(tokenList[i].mValue, tokenList[i + 1]);
+                            i++;
+                        } else if (tokenList[i].mType != TokenType.DELIMITER)
+                            buf = express(tokenList[i]).mValue;
+                        Console.Write(mLexer.stripBracketString(buf, '\"'));
+                    }
+                }
             } else if (tokens[1].mType == TokenType.STRING) {
-                Console.Write(tokens[1].mValue);
+                Console.Write(mLexer.stripBracketString(tokens[1].mValue, '\"'));
             }
             calcError("printStatement", tokens);
         }
@@ -360,7 +370,7 @@ namespace KScript
         public void returnStatement(List<Token> tokens)
         {
             printToken("returnStatement", tokens);
-            List<Token> buf = getVariable(tokens[1]);
+            List<Token> buf = cnvVariableList(tokens[1]);
             addVariable(new Token("return", TokenType.VARIABLE), buf[0]);
         }
 
@@ -369,10 +379,11 @@ namespace KScript
         /// </summary>
         /// <param name="funcName">関数名</param>
         /// <param name="arg">引数(a,b,.. )</param>
+        /// <param name="ret">return変数</param>
         /// <returns></returns>
-        public string funcStatement(string funcName, Token arg, Token ret)
+        public string funcStatement(string funcName, Token arg, Token ret = null)
         {
-            System.Diagnostics.Debug.WriteLine($"funcStatement {funcName} {arg} {ret}");
+            //System.Diagnostics.Debug.WriteLine($"funcStatement {funcName} {arg} {ret}");
             string result = innerFunc(funcName, arg);   //  内部関数処理
             if (result != "") {
                 return result;
@@ -406,10 +417,11 @@ namespace KScript
         /// <returns>処理結果</returns>
         private string innerFunc(string funcName, Token arg)
         {
-            List<Token> args = getVariable(arg);
+            string argValue = mLexer.stripBracketString(arg.mValue);
+            Token args = new Token(cnvArgData(new Token(argValue, arg.mType)), TokenType.VARIABLE);
             switch (funcName) {
                 case "input": return Console.ReadLine();
-                case "arrayStart": return getArrayStart(args).ToString();
+                case "arrayContain": return arrayContain(args).ToString();
                 case "arraySize": return getArraySize(args).ToString();
                 case "arrayClear": arrayClear(args); return " ";
                 default: break;
@@ -418,31 +430,39 @@ namespace KScript
         }
 
         /// <summary>
-        /// 配列の開始位置(内部関数)
+        /// 引数の数式を変換した引数にする
         /// </summary>
-        /// <param name="args">配列名</param>
-        /// <returns>開始位置</returns>
-        private int getArrayStart(List<Token> args)
+        /// <param name="arg">引数</param>
+        /// <returns>引数文字列</returns>
+        private string cnvArgData(Token arg)
         {
-            string arrayName = getArrayName(args[0]);
-            int start = int.MaxValue;
-            foreach (var variable in mVariables) {
-                int sp = variable.Key.IndexOf("[");
-                if (0 <= sp) {
-                    if (getArrayName(new Token(variable.Key, TokenType.VARIABLE)) == arrayName) {
-                        int ep = variable.Key.IndexOf("]");
-                        if (sp + 1 < ep) {
-                            string infix = variable.Key.Substring(sp + 1, ep - sp - 1);
-                            int arrayNo = int.Parse(infix);
-                            if (arrayNo < start)
-                                start = arrayNo;
-                        }
-                    }
+            List<Token> tokens = mLexer.splitArgList(arg.mValue);
+            string buf = "";
+            for (int i = 0; i < tokens.Count; i++) {
+                if (tokens[i].mType == TokenType.EXPRESS) {
+                    buf += express(tokens[i]).mValue;
+                } else if (tokens[i].mType == TokenType.VARIABLE) {
+                    if (mVariables.ContainsKey(tokens[i].mValue))
+                        buf += mVariables[tokens[i].mValue];
+                    else
+                        buf += tokens[i].mValue;
+                } else {
+                    buf += tokens[i].mValue;
                 }
             }
-            if (start == int.MaxValue)
-                start = 0;
-            return start;
+            return buf;
+        }
+
+        /// <summary>
+        /// 配列変数の存在を確認(内部関数)
+        /// </summary>
+        /// <param name="args">引数</param>
+        /// <returns>0:存在しない/1:存在する</returns>
+        private int arrayContain(Token args)
+        {
+            if (mVariables.ContainsKey(args.mValue))
+                return 1;
+            return 0;
         }
 
         /// <summary>
@@ -450,13 +470,16 @@ namespace KScript
         /// </summary>
         /// <param name="args">配列名</param>
         /// <returns>サイズ</returns>
-        private int getArraySize(List<Token> args)
+        private int getArraySize(Token args)
         {
-            string arrayName = getArrayName(args[0]);
+            string arrayName = getArrayName(args);
+            int sp = args.mValue.IndexOf(",");
+            if (0 < sp)
+                arrayName = args.mValue.Substring(0, sp);
             int count = 0;
             foreach (var variable in mVariables) {
                 if (0 <= variable.Key.IndexOf("[")) {
-                    if (getArrayName(new Token(variable.Key, TokenType.VARIABLE)) == arrayName)
+                    if (0 <= variable.Key.IndexOf(arrayName))
                         count++;
                 }
             }
@@ -467,9 +490,9 @@ namespace KScript
         /// 配列をクリア(内部関数)
         /// </summary>
         /// <param name="args">配列名</param>
-        private void arrayClear(List<Token> args)
+        private void arrayClear(Token args)
         {
-            string arrayName = getArrayName(args[0]);
+            string arrayName = getArrayName(args);
             int count = 0;
             foreach (var variable in mVariables) {
                 if (0 <= variable.Key.IndexOf("[")) {
@@ -509,7 +532,7 @@ namespace KScript
         /// <returns>計算結果</returns>
         private string expressFunc(string funcName, Token arg)
         {
-            List<Token> argValue = getVariable(arg);
+            List<Token> argValue = cnvVariableList(arg);
             string buf = "";
             foreach (Token token in argValue)
                 buf += express(token).mValue + ",";
@@ -614,13 +637,14 @@ namespace KScript
                             statement.Add(tokens[++i]);         //  (...) 制御文
                             List<Token> stateList = getStatement(tokens, ++i);
                             statement.AddRange(stateList);      //  {文...}/文 処理文
-                            i += stateList.Count - 1;
+                            i += stateList.Count;
                             if (i < tokens.Count && tokens[i].mValue == "else") {
                                 statement.Add(tokens[i]);       //  else
                                 stateList = getStatement(tokens, ++i);
                                 statement.AddRange(stateList);  //  {文...}/文 処理分
-                                i += stateList.Count - 1;
+                                i += stateList.Count;
                             }
+                            i--;
                         } else if (tokens[i].mValue == "return" ||
                             tokens[i].mValue == "break" ||
                             tokens[i].mValue == "continue") {
@@ -751,7 +775,6 @@ namespace KScript
                     buf += funcStatement(funcName, tokenList[i + 1], null);
                     i++;
                 } else if (tokenList[i].mType == TokenType.EXPRESS) {
-                    //List<Token> tokens = mLexer.tokenList(mLexer.stripBracketString(tokenList[i].mValue));
                     List<Token> tokens = mLexer.tokenList(tokenList[i].mValue);
                     buf += cnvExpress(tokens, 0);
                 } else if (tokenList[i].mType == TokenType.STATEMENT) {
@@ -763,7 +786,16 @@ namespace KScript
                     buf += tokenList[i].mValue;
                 }
             }
-            return mCalc.expression(buf).ToString();
+            if (0 < buf.Length && buf[0] == '\"')
+                return buf;
+            else {
+                double ret = mCalc.expression(buf);
+                if (mCalc.mError) {
+                    System.Diagnostics.Debug.WriteLine($"{buf} {mCalc.mErrorMsg}");
+                    return buf;
+                } else
+                    return ret.ToString();
+            }
         }
 
         /// <summary>
@@ -809,13 +841,25 @@ namespace KScript
         {
             char[] sep = new char[] { '[', ']' };
             if (0 > token.mValue.IndexOf("[")) {
+                //  配列以外
                 return token;
             } else if (0 <= token.mValue.IndexOf("[]")) {
+                //  1次元配列宣言
+                return token;
+            } else if (0 <= token.mValue.IndexOf("[,]")) {
+                //  2次元配列宣言
                 return token;
             } else {
+                //  配列の個別インデックス変換([m,n] → [2,3])
                 string[] str = token.mValue.Split(sep);
                 if (2 <= str.Length) {
-                    string buf = str[0] + '[' + express(new Token(str[1], TokenType.EXPRESS)).mValue + ']';
+                    string[] elements = str[1].Split(',');
+                    string buf = "";
+                    for (int i = 0; i < elements.Length; i++) {
+                        buf += express(new Token(elements[i], TokenType.EXPRESS)).mValue + ",";
+                    }
+                    buf = buf.TrimEnd(',');
+                    buf= str[0] + '[' + buf + ']';
                     return new Token(buf, TokenType.VARIABLE);
                 }
             }
@@ -823,7 +867,7 @@ namespace KScript
         }
 
         /// <summary>
-        /// 配列の一括設定 ( abc[] = { 1, 2, 3 } )
+        /// 1次元配列の一括登録 ( abc[] = { 1, 2, 3 } )
         /// </summary>
         /// <param name="name">配列名</param>
         /// <param name="data">配列データ</param>
@@ -835,6 +879,25 @@ namespace KScript
             for (int i = 0; i < datas.Length; i++) {
                 string buf = $"{arrayName}[{i}]";
                 addVariable(new Token(buf, TokenType.VARIABLE), new Token(datas[i].Trim(), TokenType.LITERAL));
+            }
+        }
+
+        /// <summary>
+        /// 2次元配列の一括登録 ( abc[,] = { { 1,2,3..}, {2,3,4,..}, .... }
+        /// </summary>
+        /// <param name="name">配列名</param>
+        /// <param name="data">配列データ</param>
+        private void setArrayData2(Token name, Token data)
+        {
+            string arrayName = name.mValue.Substring(0, name.mValue.IndexOf('['));
+            string str = mLexer.stripBracketString(data.mValue, '{');
+            List<string> strings = mLexer.getBracketStringList(str, 0, '{');
+            for (int i = 0; i < strings.Count; i++) {
+                string[] datas = strings[i].Split(',');
+                for (int j = 0; j < datas.Length; j++) {
+                    string buf = $"{arrayName}[{i},{j}]";
+                    addVariable(new Token(buf, TokenType.VARIABLE), new Token(datas[j].Trim(), TokenType.LITERAL));
+                }
             }
         }
 
@@ -965,9 +1028,9 @@ namespace KScript
         /// 配列を別の配列に移す(parseからCurrentへ)
         /// src[] → src[1],src[2]... → dest[1],dest[2]...
         /// </summary>
-        /// <param name="src"></param>
-        /// <param name="dest"></param>
-        /// <param name="parse"></param>
+        /// <param name="src">ソース配列名</param>
+        /// <param name="dest">変換配列名</param>
+        /// <param name="parse">Parse</param>
         private void getFuncArray(Token src, Token dest, KParse parse)
         {
             if (src == null || dest == null || parse == null) return;
@@ -990,12 +1053,12 @@ namespace KScript
         /// </summary>
         /// <param name="arg">引数トークン</param>
         /// <returns>引数リスト</returns>
-        private List<Token> getVariable(Token arg)
+        private List<Token> cnvVariableList(Token arg)
         {
             List<Token> argValue = new List<Token>();
-            string[] args = mLexer.stripBracketString(arg.mValue, '(').Split(',');
-            for (int i = 0; i < args.Length; i++) {
-                if (0 <= args[i].IndexOf("[]"))
+            List<string> args =　mLexer.commaSplit(mLexer.stripBracketString(arg.mValue, '('));
+            for (int i = 0; i < args.Count; i++) {
+                if (0 <= args[i].IndexOf("["))
                     argValue.Add(new Token(args[i].Trim(), TokenType.VARIABLE));
                 else
                     argValue.Add(express(new Token(args[i].Trim(), TokenType.EXPRESS)));
