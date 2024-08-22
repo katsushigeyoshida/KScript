@@ -18,9 +18,9 @@ if (sortNo == 5) simpleInsert2(data[]);
 if (sortNo == 6) shellSort(data[]);
 
 simpleSelect(a[]) {
-    print("単純選択法\n");
-    sp = arrayStart(a[]);
+    sp = 0;
     ep = arraySize(a[]);
+    print("単純選択法 ",ep, "\n");
     count = 0;
     n = ep;
     for ( i = sp; i < n; i = i + 1) {
@@ -38,7 +38,7 @@ simpleSelect(a[]) {
 
 bubleSort(a[]) {
     print("バブルソート\n");
-    sp = arrayStart(a[]);
+    sp = 0;
     ep = arraySize(a[]);
     count = 0;
     for ( i = sp; i < ep; i = i +1){
@@ -57,7 +57,7 @@ bubleSort(a[]) {
 
 simpleInsert(a[]) {
     print("単純挿入法(1列目作業データ)\n");
-    sp = arrayStart(a[]);
+    sp = 0;
     ep = arraySize(a[]);
     count = 0;
     for ( i = sp; i < ep; i = i +1){
@@ -157,7 +157,7 @@ shellSort(a[]) {
 }
 
 arrayPrint(b[]) {
-    i = arrayStart(b[]);
+    i = 0;
     ep = arraySize(b[]);
     while (i < ep) {
         print(b[i], " ");

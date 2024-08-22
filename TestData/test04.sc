@@ -8,13 +8,13 @@ b[] = addArray(abc[], add);
 printArray(b[]);
 
 arrayClear(abc[]);
-start = arrayStart(abc[]);
+start = 0;
 size = arraySize(abc[]);
 print("start = ", start, " size = ", size, "\n");
 
 //  配列に加算関数
 addArray(array[], add) {
-    start = arrayStart(array[]);
+    start = 0;
     size = arraySize(array[]);
     for (int i = start; i < size; i = i + 1) {
         array[i] = array[i] + add;
@@ -23,7 +23,7 @@ addArray(array[], add) {
 }
 //  配列表示
 printArray(array[]) {
-    start = arrayStart(array[]);
+    start = 0;
     size = arraySize(array[]);
     print("start = ", start, " size = ", size, "\n");
     for (int i = start; i < size; i = i + 1) {

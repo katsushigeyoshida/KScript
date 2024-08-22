@@ -3,18 +3,20 @@ print("if Test", "\n");
 a = 3 / 2;
 b = 2;
 print("a = ", a, " b = ", b, "  ");
-if (a < b) print(a, " < ", b);
-else  print(a, " > ", b);
+if (a > b) print(a, " < ", b, "\n");
+else print(a, " > ", b, "\n");
 print();
 //return;
 //	for Test
-print("for Test", "\n");
-for ( n = 1; n < 100; n = n + 1) {
+max = 50;
+print("for Test (max = ", max, ")\n");
+for ( n = 1; n < max; n += 2) {
 	print(n, " ");
 }
 print();
 //	return;
 //	PrintTest
+print("print Test \n");
 a = "a = ";
 b = 10;
 c = " でした";
