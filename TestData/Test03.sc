@@ -25,13 +25,11 @@ print("最大値= ", max, " (", b, ")\n", "素数\n");
 while (m < sqrt(max)) {
     if (a[m] == 1) {
         print(m," : ");
-        for (n = m * 2; n < max; n += m) {
+        for (n = m; n < max; n += m)
             a[n] = 0;
-        }
         for (n = 2; n < max; n++) {
-            if (a[n] == 1) {
+            if (a[n] == 1)
                 print(n, " ");
-            }
         }
         print();
     }

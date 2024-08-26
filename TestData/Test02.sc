@@ -3,7 +3,7 @@ print("if Test", "\n");
 a = 3 / 2;
 b = 2;
 print("a = ", a, " b = ", b, "  ");
-if (a > b) print(a, " < ", b, "\n");
+if (a < b) print(a, " < ", b, "\n");
 else print(a, " > ", b, "\n");
 print();
 //return;

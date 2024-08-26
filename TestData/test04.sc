@@ -5,6 +5,12 @@ total = sum(abc[]);
 print("SumArray : ", total, "\n");
 add = 2;
 b[] = addArray(abc[], add);
+size = arraySize(b[]);
+print("size ",size, " ");
+for (i = 0; i < size; i++)
+	print(b[i], " ");
+print();
+
 printArray(b[]);
 
 arrayClear(abc[]);
@@ -16,7 +22,7 @@ print("start = ", start, " size = ", size, "\n");
 addArray(array[], add) {
     start = 0;
     size = arraySize(array[]);
-    for (int i = start; i < size; i = i + 1) {
+    for (i = start; i < size; i = i + 1) {
         array[i] = array[i] + add;
     }
     return array[];
@@ -26,7 +32,7 @@ printArray(array[]) {
     start = 0;
     size = arraySize(array[]);
     print("start = ", start, " size = ", size, "\n");
-    for (int i = start; i < size; i = i + 1) {
+    for (i = start; i < size; i = i + 1) {
         print(array[i], " ");
     }
     print();

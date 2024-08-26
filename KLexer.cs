@@ -4,13 +4,15 @@
     public enum TokenType
     {
         VARIABLE,               //  変数名
-        ARRAY,                  //  配列変数名
-        OPERATOR,               //  演算子
-        CONDITINAL,             //  条件演算子
-        DELIMITER,              //  区切り文字
+        ARRAY,                  //  配列変数名([],[,])
+        OPERATOR,               //  演算子(+,-,*,/,%,^)
+        CONDITINAL,             //  条件演算子(==,!=,<,>,<=,>=)
+        ASSIGNMENT,             //  代入演算子(=,+=,-=,*=,/=,^=,++,--)
+        DELIMITER,              //  区切り文字((,),{,},[,],;,',',)
         LITERAL,                //  固定値(数値)
         STRING,                 //  固定値(文字列)
         STATEMENT,              //  文
+        STATEMENTS,             //  複数の文
         EXPRESS,                //  数式
         FUNCTION,               //  関数
         COMMENT,                //  コメント
@@ -20,14 +22,16 @@
     public class Token
     {
         public static string[] comment = { "//", "/*", "*/" };
-        public static string[] conditionOperator = { 
+        public static string[] condition = { 
             "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!" 
         };
-        public static string[] multiOperators = { "++", "--", "+=", "-=", "*=", "/=", "^=" };
+        public static string[] assignment = {
+            "=", "++", "--", "+=", "-=", "*=", "/=", "^=" };
         public static char[] operators = { 
             '=', '+', '-', '*', '/', '%', '^', '!', '<', '>', '&', '|'
         };
-        public static char[] delimiter = { '(', ')', '{', '}', '[', ']', ' ', ',', ';' };
+        public static char[] delimiter = {
+            '(', ')', '{', '}', '[', ']', ' ', ',', ';' };
         public static char[] skipChar = { ' ', '\t', '\r', '\n' };
         public static string[] statement = {
             "let", "while", "if", "else", "for", "return", "break", "continue", "print" 
@@ -42,6 +46,11 @@
             mType = type;       //  データの種類
         }
 
+        public Token copy()
+        {
+            return new Token(mValue, mType);
+        }
+
         public override string ToString()
         {
             return $"{mValue}[{mType.ToString()}]";
@@ -53,14 +62,15 @@
     /// SKIP CHAR               :  ' ', '\t', '\r', '\n'
     /// コメント  (COMMENT)     : // ... \n, /* ...*/
     /// 計算式    (EXPRESS)     : ( 計算式 )
-    /// 文リスト  (STAEMENT)    : { 文; 文; ... }
+    /// 文リスト  (STAETMENTS)  : { 文; 文; ... }
     /// 文        (STATEMENT)   : let|while|if|else|return|print
     /// 変数名    (VARIABLE)    : [a..z|A..Z][a..z|A..Z|0..9]*
     /// 関数名    (FUNCTION)    : [a..z|A..Z][a..z|A..Z|0..9]* (...)
     /// 配列      (ARRAY)       : (VARIABLE)'['*']'
     /// 数値      (LITERAL)     : [0..9|.|+|-][0..9|.]
     /// 文字列    (STRING)      : "..."
-    /// 演算子    (OPERATOR)    : =|+|-|*|/|%|^|!
+    /// 演算子    (OPERATOR)    : +|-|*|/|%|^|!
+    /// 代入演算子(ASSIGNMENT)  : =|+=|-=|*=|/=|^=|++|--
     /// 条件演算子(CONDITINAL)  : ==|!=|<|>|<=|>=
     /// 区切り文字(DELIMITER)   : (|)|{|}| |,|;
     /// </summary>
@@ -104,7 +114,7 @@
                 } else if (str[i] == '(' || str[i] == '{') {
                     //  括弧で囲まれた計算式
                     buf = getBracketString(str, i, str[i]);
-                    tokens.Add(new Token(buf, str[i] == '{' ? TokenType.STATEMENT : TokenType.EXPRESS));
+                    tokens.Add(new Token(buf, str[i] == '{' ? TokenType.STATEMENTS : TokenType.EXPRESS));
                     i += buf.Length - 1;
                 } else if (Char.IsLetter(str[i])) { //  アルファベットの確認(a-z,A-Z,全角も)
                     //  変数名、予約語
@@ -147,19 +157,23 @@
                 } else if (str[i] == '\"') {
                     //  文字列
                     buf = getBracketString(str, i, str[i]);
-                    tokens.Add(new Token(stripBracketString(buf, str[i]), TokenType.STRING));
                     i += buf.Length - 1;
-                } else if (twoChar != "" && 0 <= Array.IndexOf(Token.multiOperators, twoChar)) {
+                    buf = stripBracketString(buf, str[i]);
+                    buf = buf.Replace("\\n", "\n");
+                    tokens.Add(new Token(buf, TokenType.STRING));
+                } else if (twoChar != "" && 0 <= Array.IndexOf(Token.assignment, twoChar)) {
                     //  複合演算子
-                    tokens.Add(new Token(twoChar, TokenType.OPERATOR));
+                    tokens.Add(new Token(twoChar, TokenType.ASSIGNMENT));
                     i++;
                 } else if (0 <= Array.IndexOf(Token.operators, str[i])) {
                     //  識別子(演算子/条件演算子)
-                    if (twoChar != "" && 0 <= Array.IndexOf(Token.conditionOperator, twoChar)) {
+                    if (twoChar != "" && 0 <= Array.IndexOf(Token.condition, twoChar)) {
                         tokens.Add(new Token(twoChar, TokenType.CONDITINAL));
                         i++;
-                    } else if (0 <= Array.IndexOf(Token.conditionOperator, str[i].ToString())) {
+                    } else if (0 <= Array.IndexOf(Token.condition, str[i].ToString())) {
                         tokens.Add(new Token(str[i].ToString(), TokenType.CONDITINAL));
+                    } else if (0 <= Array.IndexOf(Token.assignment, str[i].ToString())) {
+                        tokens.Add(new Token(str[i].ToString(), TokenType.ASSIGNMENT));
                     } else {
                         tokens.Add(new Token(str[i].ToString(), TokenType.OPERATOR));
                     }
@@ -174,6 +188,29 @@
         }
 
         /// <summary>
+        /// トークンをセパレータで区切ってまとめる
+        /// </summary>
+        /// <param name="tokens">トークンリスト</param>
+        /// <param name="sep">セパレータ</param>
+        /// <returns>トークンリストのリスト</returns>
+        public List<List<Token>> tokensList(List<Token> tokens, char sep = ',')
+        {
+            List<List<Token>> tokensList = new List<List<Token>>();
+            List<Token> buf = new List<Token>();
+            foreach (Token token in tokens) {
+                if (token.mType == TokenType.DELIMITER && token.mValue == sep.ToString()) {
+                    tokensList.Add(buf);
+                    buf = new List<Token>();
+                } else {
+                    buf.Add(token);
+                }
+            }
+            if (0 < buf.Count)
+                tokensList.Add(buf);
+            return tokensList;
+        }
+
+        /// <summary>
         /// 括弧付き文字列で前後の括弧を除いた文字列
         /// </summary>
         /// <param name="str">括弧付き文字列</param>
@@ -184,9 +221,10 @@
             int offset = Array.IndexOf(mBrackets, bracket);
             if (offset < 0)
                 return str;
+            str = str.Trim();
             int sp = str.IndexOf(mBrackets[offset]);
             int ep = str.LastIndexOf(mBrackets[offset + 1]);
-            if (sp < 0 || ep < 0)
+            if (sp != 0 || ep < 0 || sp >= ep)
                 return str;
             return str.Substring(sp + 1, ep - sp - 1);
         }

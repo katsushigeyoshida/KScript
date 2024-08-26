@@ -6,7 +6,7 @@ for (i = 0; i < 2; i++)
 print();
 fruit["Apple"] = 20;
 fruit["Orenge"] = 50;
-print(fruit["Orenge"], " ", fruit["Apple"],"\n")
+print(fruit["Orenge"], " ", fruit["Apple"],"\n");
 
 print("2次元配列\n");
 a[,] = {
