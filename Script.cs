@@ -4,7 +4,7 @@ namespace KScript
 {
     /// <summary>
     /// スクリプトの処理
-    ///     
+    ///     KParse で処理した構文を実行処理する
     /// 
     /// 関数の構成
     ///   Script            スクリプトの読み込み登録
@@ -12,32 +12,29 @@ namespace KScript
     ///       exeStatements         複数構文の実行
     ///         exeStatement            構文の実行
     ///         　　letStatement              代入文の処理
-    ///         　　  funcStatement
-    ///         　　  express
-    ///         　　  setArrayData
-    ///         　　  getArrayVariable
+    ///         　　  funcStatement               関数文の処理
+    ///         　　  express                     数式処理
+    ///         　　  setArrayData                配列の一括値設定
+    ///         　　  getArrayVariable            配列変数名の変換
     ///         　　ifStatement               if文の処理
-    ///         　　  conditinalStatement
-    ///         　　  exeStatements
+    ///         　　  conditinalStatement         条件文
+    ///         　　  exeStatements               構文処理
     ///         　　whileStatement            while文の処理
-    ///         　　  conditinalStatement
-    ///         　　  exeStatements
+    ///         　　  conditinalStatement         条件文
+    ///         　　  exeStatements               構文処理
     ///         　　forStatement              for文の処理
-    ///         　　  mParse.getStatements
-    ///         　　  letStatement
-    ///         　　  conditinalStatement
-    ///         　　  exeStatements
+    ///         　　  letStatement                代入文処理(初期値)
+    ///         　　  conditinalStatement         条件文
+    ///         　　  exeStatements               構文処理
     ///         　　returnStatement           return文の処理
-    ///         　　  express
+    ///         　　  express                     数式処理
     ///         　　printStatement            print文の処理
-    ///         　　  express
+    ///         　　  express                     数式処理
     ///         　　funcStatement             関数文の実行
-    ///         　　  funcExpress
-    ///                 
-    ///   funcExpress               関数処理
-    ///     innerFunc                   追加内部関数
-    ///     programFunc                 プログラム関数
-    ///     funcExpress                 数式処理関数
+    ///               function                    関数処理
+    ///                 innerFunc                   追加内部関数(ScriptLib)
+    ///                 programFunc                 プログラム関数
+    ///                 function                     数式処理関数
     /// 
     /// 関数一覧
     /// Script(string script)                                   コンストラクタ(スクリプト文の設定)
@@ -51,13 +48,9 @@ namespace KScript
     /// printStatement(List<Token> tokens)                      print文の処理
     /// returnStatement(List<Token> tokens)                     return文の処理(return 変数に登録)
     /// funcStatement(List<Token> tokens, int sp, Token ret = null) 関数文の実行
-    /// funcExpress(Token funcName, Token arg, Token ret = null)    関数処理
+    /// function(Token funcName, Token arg, Token ret = null)    関数処理
     /// 
     /// programFunc(string funcName, Token arg, Token ret)      プログラム関数の実行(別 Script で実行)
-    /// innerFunc(Token funcName, Token arg)                    追加内部関数
-    /// arrayContain(Token args)                                配列変数の存在を確認(内部関数)
-    /// getArraySize(Token args)                                配列のサイズの取得(内部関数)
-    /// arrayClear(Token args)                                  配列をクリア(内部関数)
     /// 
     /// conditinalStatement(List<Token> tokens, int sp = 0)     条件文の処理(比較) (a < b, a == b...)
     /// 
@@ -67,7 +60,6 @@ namespace KScript
     /// 
     /// getFuncArgs(string func, int sp = 0)                    プログラム関数引数をリストに変換
     /// setFuncArg(List<Token> src, List<Token> dest, Script script)    プログラム関数の引数を関数側にコピー
-    /// cnvArgData(Token arg)                                   引数の数式を変換した引数にする
     /// cnvArgList(Token arg)                                   引数をリストに変換( '(a,b,c)' →  'a','b','c' )
     /// getVariable(Token token)                                変数名を数値に変換
     /// getValueToken(string value)                             変数または配列変数を数値に変換
@@ -84,11 +76,14 @@ namespace KScript
     /// </summary>
     public class Script
     {
+        public enum RETURNTYPE { NORMAL, CONTINUE, BREAK, RETURN }
+
         public List<Token> mTokenList = new List<Token>();
         public List<List<Token>> mStatements = new List<List<Token>>();
 
-        private KParse mParse = new KParse();
-        private KLexer mLexer = new KLexer();
+        public ScriptLib mScriptLib;
+        public KParse mParse = new KParse();
+        public KLexer mLexer = new KLexer();
         private YCalc mCalc = new YCalc();
 
         /// <summary>
@@ -97,6 +92,7 @@ namespace KScript
         /// <param name="script">スクリプト文</param>
         public Script(string script)
         {
+            mScriptLib = new ScriptLib(this, mParse.mVariables);
             //  字句解析・ スクリプト登録(mFunctionsに登録)
             mTokenList = mLexer.tokenList(script);
             mStatements = mParse.getStatements(mTokenList);
@@ -373,7 +369,7 @@ namespace KScript
         {
             Token funcName = tokens[sp];
             Token arg = tokens[sp + 1];
-            Token result = funcExpress(funcName, arg, ret);
+            Token result = function(funcName, arg, ret);
             if (result != null)
                 mParse.addVariable(new Token("return", TokenType.VARIABLE), result);
         }
@@ -385,9 +381,9 @@ namespace KScript
         /// <param name="arg">引数</param>
         /// <param name="ret">戻り値</param>
         /// <returns></returns>
-        private Token funcExpress(Token funcName, Token arg, Token ret = null)
+        private Token function(Token funcName, Token arg, Token ret = null)
         {
-            Token result = innerFunc(funcName, arg);   //  内部関数処理
+            Token result = mScriptLib.innerFunc(funcName, arg, ret);   //  内部関数処理
             if (result != null) {
                 return result;
             } else if (mParse.mFunctions.ContainsKey(funcName.mValue)) {
@@ -405,10 +401,11 @@ namespace KScript
         /// <param name="funcName">関数名</param>
         /// <param name="arg">引数</param>
         /// <param name="ret">配列の戻り値</param>
-        /// <returns>戻り値</returns>
+        /// <returns>戻り値(関数側の変数名)</returns>
         private Token programFunc(string funcName, Token arg, Token ret)
         {
             Script script = new Script(mParse.mFunctions[funcName].mValue);
+            //  参照関数の設定
             script.mParse.mFunctions = mParse.mFunctions;
             //  引数の変換
             List<Token> srcArgs = getFuncArgs(arg.mValue);
@@ -421,87 +418,6 @@ namespace KScript
                 return script.mParse.mVariables["return"];
             } else
                 return null;
-        }
-
-        /// <summary>
-        /// 追加内部関数
-        /// </summary>
-        /// <param name="funcName">関数名</param>
-        /// <param name="arg">引数</param>
-        /// <returns>戻り値</returns>
-        private Token innerFunc(Token funcName, Token arg)
-        {
-            string argValue = mLexer.stripBracketString(arg.mValue);
-            Token args = cnvArgData(new Token(argValue, arg.mType));
-            switch (funcName.mValue) {
-                case "input": return new Token(Console.ReadLine(), TokenType.STRING);
-                case "arrayContain": return new Token(arrayContain(args).ToString(), TokenType.LITERAL);
-                case "arraySize": return new Token(getArraySize(args).ToString(), TokenType.LITERAL);
-                case "arrayClear": arrayClear(args); return null;
-                default: break;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// 配列変数の存在を確認(内部関数)
-        /// </summary>
-        /// <param name="args">引数</param>
-        /// <returns>0:存在しない/1:存在する</returns>
-        public int arrayContain(Token args)
-        {
-            if (mParse.mVariables.ContainsKey(args.mValue))
-                return 1;
-            return 0;
-        }
-
-        /// <summary>
-        /// 配列のサイズの取得(内部関数)
-        /// </summary>
-        /// <param name="args">配列名</param>
-        /// <returns>サイズ</returns>
-        public int getArraySize(Token args)
-        {
-            Token argsName = getValueToken(args.mValue);
-            int cp = argsName.mValue.LastIndexOf(',');
-            int sp = argsName.mValue.IndexOf("[");
-            if (0 < argsName.mValue.IndexOf("[,]"))
-                cp = -1;
-            string arrayName = "";
-            if (0 < cp)
-                arrayName = argsName.mValue.Substring(0, cp + 1);
-            else if (0 < sp)
-                arrayName = argsName.mValue.Substring(0, sp);
-            int count = 0;
-            foreach (var variable in mParse.mVariables) {
-                if (0 < cp) {
-                    int ecp = variable.Key.LastIndexOf(",");
-                    if (0 < ecp)
-                        if (variable.Key.Substring(0, ecp + 1) == arrayName) count++;
-                } else {
-                    int esp = variable.Key.IndexOf("[");
-                    if (0 <= esp)
-                        if (variable.Key.Substring(0, esp) == arrayName) count++;
-                }
-            }
-            return count;
-        }
-
-        /// <summary>
-        /// 配列をクリア(内部関数)
-        /// </summary>
-        /// <param name="args">配列名</param>
-        public void arrayClear(Token args)
-        {
-            string arrayName = args.mValue.Substring(0, args.mValue.IndexOf("["));
-            int count = 0;
-            foreach (var variable in mParse.mVariables) {
-                int sp = variable.Key.IndexOf("[");
-                if (0 <= sp) {
-                    if (variable.Key.Substring(0, sp) == arrayName)
-                        mParse.mVariables.Remove(variable.Key);
-                }
-            }
         }
 
         /// <summary>
@@ -584,7 +500,7 @@ namespace KScript
                     List<Token> tokenList = mLexer.tokenList(mLexer.stripBracketString(tokens[i].mValue));
                     token = express(tokenList);
                 } else if (tokens[i].mType == TokenType.FUNCTION) {
-                    token = funcExpress(tokens[i], tokens[i + 1]);
+                    token = function(tokens[i], tokens[i + 1]);
                     i++;
                 } else if (tokens[i].mType == TokenType.OPERATOR) {
                     token = tokens[i].copy();
@@ -629,7 +545,26 @@ namespace KScript
         }
 
         /// <summary>
+        /// 引数をリストに変換( '(a,b,c)' →  'a','b','c' )
+        /// </summary>
+        /// <param name="arg">引数</param>
+        /// <returns>引数リスト</returns>
+        private List<Token> cnvArgList(Token arg)
+        {
+            List<Token> argValue = new List<Token>();
+            List<string> args = mLexer.commaSplit(mLexer.stripBracketString(arg.mValue, '('));
+            for (int i = 0; i < args.Count; i++) {
+                if (0 <= args[i].IndexOf("["))
+                    argValue.Add(new Token(args[i].Trim(), TokenType.VARIABLE));
+                else
+                    argValue.Add(express(new Token(args[i].Trim(), TokenType.EXPRESS)));
+            }
+            return argValue;
+        }
+
+        /// <summary>
         /// プログラム関数引数をリストに変換
+        /// funcName(args) { staetment .. } → List(args)
         /// </summary>
         /// <param name="func">引数文字列</param>
         /// <param name="sp">開始位置</param>
@@ -668,49 +603,6 @@ namespace KScript
                     script.mParse.addVariable(dest[i], express(new Token(buf, TokenType.LITERAL)));
                 }
             }
-        }
-
-        /// <summary>
-        /// 引数の数式を変換した引数にする
-        /// </summary>
-        /// <param name="arg">引数</param>
-        /// <returns>引数文字列</returns>
-        public Token cnvArgData(Token arg)
-        {
-            List<Token> tokens = mLexer.splitArgList(arg.mValue);
-            string buf = "";
-            for (int i = 0; i < tokens.Count; i++) {
-                if (tokens[i].mType == TokenType.EXPRESS) {
-                    buf += express(tokens[i]).mValue;
-                } else if (tokens[i].mType == TokenType.VARIABLE &&
-                    !(i + 1 < tokens.Count && tokens[i + 1].mValue == "[")) {
-                    if (mParse.mVariables.ContainsKey(tokens[i].mValue))
-                        buf += mParse.mVariables[tokens[i].mValue];
-                    else
-                        buf += tokens[i].mValue;
-                } else {
-                    buf += tokens[i].mValue;
-                }
-            }
-            return new Token(buf, TokenType.VARIABLE);
-        }
-
-        /// <summary>
-        /// 引数をリストに変換( '(a,b,c)' →  'a','b','c' )
-        /// </summary>
-        /// <param name="arg">引数</param>
-        /// <returns>引数リスト</returns>
-        private List<Token> cnvArgList(Token arg)
-        {
-            List<Token> argValue = new List<Token>();
-            List<string> args = mLexer.commaSplit(mLexer.stripBracketString(arg.mValue, '('));
-            for (int i = 0; i < args.Count; i++) {
-                if (0 <= args[i].IndexOf("["))
-                    argValue.Add(new Token(args[i].Trim(), TokenType.VARIABLE));
-                else
-                    argValue.Add(express(new Token(args[i].Trim(), TokenType.EXPRESS)));
-            }
-            return argValue;
         }
 
         /// <summary>
@@ -869,6 +761,7 @@ namespace KScript
 
         /// <summary>
         /// プログラム関数の戻り値受け渡し
+        /// 関数の戻り値(f配列)を呼出し側の変数にコピー
         /// </summary>
         /// <param name="src">関数側の戻り値</param>
         /// <param name="dest">呼出し側の変数</param>
