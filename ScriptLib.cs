@@ -65,11 +65,22 @@ namespace KScript
                 case "arrayClear": arrayClear(args); break;
                 case "cmd": cmd(args); break;
                 case "unitMatrix": return unitMatrix(args, ret);
+                case "matrixTranspose": return matrixTranspose(args, ret);
+                case "matrixMulti": return matrixMulti(args, ret);
+                case "matrixAdd": return matrixAdd(args, ret);
+                case "matrixInverse": return matrixInverse(args, ret);
+                case "copyMatrix": return copyMatrix(args, ret);
                 default: break;
             }
             return null;
         }
 
+        /// <summary>
+        /// 単位行列の作成(n x n)
+        /// </summary>
+        /// <param name="size">行列の大きさ</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
         private Token unitMatrix(Token size, Token ret)
         {
             double[,] matrix = ylib.unitMatrix(ylib.intParse(size.mValue));
@@ -80,36 +91,111 @@ namespace KScript
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 転置行列  行列Aの転置A^T
+        /// </summary>
+        /// <param name="args">引数(行列 A</param>
+        /// <param name="ret"></param>
+        /// <returns></returns>
         private Token matrixTranspose(Token args, Token ret)
         {
-
+            //  2D配列を実数配列に変換
+            List<string> listArg = mLexer.commaSplit(args.mValue);
+            double[,] a = cnvArrayDouble(new Token(listArg[0], TokenType.ARRAY));
+            //  行列演算
+            double[,] c = ylib.matrixTranspose(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 行列の積  AxB
+        /// 行列の積では 結合の法則  (AxB)xC = Ax(BxC) , 分配の法則 (A+B)xC = AxC+BxC , Cx(A+B) = CxA + CxB　が可
+        /// 交換の法則は成立しない  AxB ≠ BxA
+        /// </summary>
+        /// <param name="args">引数(行列A,行列B)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
         private Token matrixMulti(Token args, Token ret)
         {
-
+            //  2D配列を実数配列に変換
+            List<string> listArg = mLexer.commaSplit(args.mValue);
+            double[,] a = cnvArrayDouble(new Token(listArg[0], TokenType.ARRAY));
+            double[,] b = cnvArrayDouble(new Token(listArg[1], TokenType.ARRAY));
+            //  行列演算
+            double[,] c = ylib.matrixMulti(a, b);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 行列の和 A+B
+        /// 異なるサイズの行列はゼロ行列にする
+        /// </summary>
+        /// <param name="args">引数(行列A,行列B)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
         private Token matrixAdd(Token args, Token ret)
         {
-
+            //  2D配列を実数配列に変換
+            List<string> listArg = mLexer.commaSplit(args.mValue);
+            double[,] a = cnvArrayDouble(new Token(listArg[0], TokenType.ARRAY));
+            double[,] b = cnvArrayDouble(new Token(listArg[1], TokenType.ARRAY));
+            //  行列演算
+            double[,] c = ylib.matrixAdd(a, b);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 逆行列 A^-1 (ある行列で線形変換した空間を元に戻す行列)
+        /// </summary>
+        /// <param name="args">引数(行列A)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
         private Token matrixInverse(Token args, Token ret)
         {
-
+            //  2D配列を実数配列に変換
+            List<string> listArg = mLexer.commaSplit(args.mValue);
+            double[,] a = cnvArrayDouble(new Token(listArg[0], TokenType.ARRAY));
+            //  行列演算
+            double[,] c = ylib.matrixInverse(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 行列のコピー
+        /// </summary>
+        /// <param name="args">引数(行列A)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
         private Token copyMatrix(Token args, Token ret)
         {
-
+            //  2D配列を実数配列に変換
+            List<string> listArg = mLexer.commaSplit(args.mValue);
+            double[,] a = cnvArrayDouble(new Token(listArg[0], TokenType.ARRAY));
+            //  行列演算
+            double[,] c = ylib.copyMatrix(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
             return mScript.mParse.mVariables["return"];
         }
 
+        /// <summary>
+        /// 配列の戻り値の設定
+        /// </summary>
+        /// <param name="src">2D配列データ</param>
+        /// <param name="dest">戻り値の配列変数名</param>
         private void setReturnArray(double[,] src, Token dest)
         {
             if (src == null || dest == null) return;
@@ -191,6 +277,49 @@ namespace KScript
                         mVariables.Remove(variable.Key);
                 }
             }
+        }
+
+        /// <summary>
+        /// 配列変数を実数配列double[,]に変換
+        /// </summary>
+        /// <param name="args">配列変数</param>
+        /// <returns>実数配列</returns>
+        public double[,] cnvArrayDouble(Token args)
+        {
+            (string arrayName, int no) = getArrayName(args);
+            int maxRow = 0, maxCol = 0;
+            foreach (var variable in mVariables) {
+                (string name, int? row, int? col) = getArrayNo(variable.Key);
+                if (name == arrayName && row != null && col != null) {
+                    maxRow = Math.Max(maxRow, (int)row);
+                    maxCol = Math.Max(maxCol, (int)col);
+                }
+            }
+            double[,] ret = new double[maxRow + 1, maxCol + 1];
+            for (int i = 0; i <= maxRow; i++) {
+                for (int j = 0; j <= maxCol; j++) {
+                    string name = $"{arrayName}[{i},{j}]";
+                    if (mVariables.ContainsKey(name))
+                        ret[i, j] = ylib.doubleParse(mVariables[name].mValue);
+                }
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// 2次元配列から配列名と行と列を取り出す
+        /// </summary>
+        /// <param name="arrayName">2D配列</param>
+        /// <returns>(配列名、行、列)</returns>
+        public (string name, int? row, int? col) getArrayNo(string arrayName)
+        {
+            List<Token> splitName = mLexer.splitArgList(arrayName);
+            if (splitName.Count < 3)
+                return ("", null, null);
+            string name = splitName[0].mValue;
+            int row = ylib.intParse(splitName[2].mValue);
+            int col = ylib.intParse(splitName[4].mValue);
+            return (name, row, col);
         }
 
         /// <summary>

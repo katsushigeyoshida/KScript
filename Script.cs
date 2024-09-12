@@ -573,8 +573,8 @@ namespace KScript
         {
             List<Token> args = new List<Token>();
             List<Token> funcList = mParse.getStatement(mLexer.tokenList(func));
-            string[] funcargs = mLexer.stripBracketString(funcList[sp].mValue, '(').Split(',');
-            for (int i = 0; i < funcargs.Length; i++)
+            List<string> funcargs = mLexer.commaSplit(mLexer.stripBracketString(funcList[sp].mValue, '('));
+            for (int i = 0; i < funcargs.Count; i++)
                 args.Add(new Token(funcargs[i].Trim(), TokenType.VARIABLE));
             return args;
         }
@@ -588,7 +588,8 @@ namespace KScript
         private void setFuncArg(List<Token> src, List<Token> dest, Script script)
         {
             for (int i = 0; i < src.Count; i++) {
-                if (0 <= src[i].mValue.IndexOf("[]")) {
+                if (0 <= src[i].mValue.IndexOf("[")) {
+                    //  配列のコピー
                     setFuncArray(src[i], dest[i], script);
                 } else {
                     List<Token> variables = mLexer.tokenList(src[i].mValue);
@@ -783,15 +784,15 @@ namespace KScript
         }
 
         /// <summary>
-        /// プログラム関数の引数受け渡し
+        /// プログラム関数の配列引数受け渡し
         /// </summary>
         /// <param name="src">呼出し元引数</param>
         /// <param name="dest">関数側引数</param>
         /// <param name="script">関数 Script</param>
         private void setFuncArray(Token src, Token dest, Script script)
         {
-            int sp = src.mValue.IndexOf("[]");
-            int dp = dest.mValue.IndexOf("[]");
+            int sp = src.mValue.IndexOf("[");
+            int dp = dest.mValue.IndexOf("[");
             if (sp < 0 || dp < 0) return;
             string srcName = src.mValue.Substring(0, sp);
             string destName = dest.mValue.Substring(0, dp);

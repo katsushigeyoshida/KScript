@@ -104,8 +104,9 @@
                     if (twoChar == "//") {
                         while (i < str.Length && (str[i] != '\n' && str[i] != '\r')) buf += str[i++];
                     } else if (twoChar == "/*") {
-                        i += 2;
                         while (i < str.Length - 1 && !(str[i] == '*' && str[i + 1] == '/')) buf += str[i++];
+                        buf += str[i++];
+                        buf += str[i++];
                     }
                     if (0 < buf.Length) {
                         tokens.Add(new Token(buf, TokenType.COMMENT));
@@ -289,7 +290,7 @@
         }
 
         /// <summary>
-        /// カンマで文字列を分割する
+        /// カンマで文字列を分割する("",(),{},[]内は無視)
         /// </summary>
         /// <param name="str">文字列</param>
         /// <returns>分割文字列リスト</returns>
