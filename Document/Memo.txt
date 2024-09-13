@@ -153,3 +153,19 @@ C言語風スクリプト言語
 2024/08/18 break, continue を追加
 2024/08/17 とりあえず動作するもの
 2024/08/07 作成開始
+
+…or create a new repository on the command line
+
+echo "# KScript" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/katsushigeyoshida/KScript.git
+git push -u origin main
+
+…or push an existing repository from the command line
+
+git remote add origin https://github.com/katsushigeyoshida/KScript.git
+git branch -M main
+git push -u origin main

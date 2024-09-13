@@ -37,11 +37,15 @@ Program :   テスト
 
 ### 配列
     複数のデータをまとめて扱うもので[ ]の中の数値を変えて値を格納する
-    a[0] = 10;
-    a[1] = 20;
-    a[2] = 30;
+        a[0] = 10;
+        a[1] = 20;
+        a[2] = 30;
     値をまとめて設定するときは
-    a[] = { 10, 20, 30 }
+        a[] = { 10, 20, 30 }
+    2次元配列
+        a[1,2] = 10;
+        a[,] = { { 1, 2, 3}, {10, 20, 30} }
+        person["name",] = { "name", age, "address" }
 
 ### 演算子
     数式を処理するための演算子
@@ -97,17 +101,25 @@ Program :   テスト
         total = sum(array[]);
 
 ### 数式処理以外の関数
-    print(a, b, "\n");          : コンソールに文字出力
-    a = input();                : コンソールからの入力
-    start = arrayStart(a[]);    : 配列の開始位置
-    size = arraySize(a[]);      : 配列のサイズ
-    arrayClear(a[]);            : 配列をクリア
+    print(a, b, "\n");              : コンソールに文字出力  
+    a = input();                    : コンソールからの入力  
+    start = arrayStart(a[]);        : 配列の開始位置  
+    size = arraySize(a[]);          : 配列のサイズ  
+    arrayClear(a[]);                : 配列をクリア  
+    a[,] = unitMatrix(size);        : 単位行列  
+    d[,] = matrixTranspose(a[,]);   : 転置行列  
+    d[,] = matrixMulti(a[,], b[,]); : 行列の積  
+    d[,] = matrixAdd(a[,], b[,]);   : 行列の和  
+    d[,] = matrixInverse(a[,]);     : 逆行列 a^-1  
+    d[,] = copyMatrix(a[,]);        : 行列のコピー  
 
 ### 数式処理 : YCalc.expression(式) を呼び出す
 
 
 
 ### 履歴
+2024/09/12 マトリックス関数追加  
+2024/08/20 2次元配列に対応  
 2024/08/18 break,continue を追加  
 2024/08/17 とりあえず動くもの  
 
@@ -118,19 +130,3 @@ Program :   テスト
 NuGetライブラリ : なし  
 自作ライブラリ  : CoreLib (YCalc, YLib)  
   
-  
-…or create a new repository on the command line
-
-echo "# KScript" >> README.md
-git init
-git add README.md
-git commit -m "first commit"
-git branch -M main
-git remote add origin https://github.com/katsushigeyoshida/KScript.git
-git push -u origin main
-
-…or push an existing repository from the command line
-
-git remote add origin https://github.com/katsushigeyoshida/KScript.git
-git branch -M main
-git push -u origin main
