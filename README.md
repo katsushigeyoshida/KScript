@@ -1,14 +1,28 @@
 # KScript
 ## C言語風のスクリプト言語
 
-比較的単純な構成で動くスクリプト言語を作成  
+比較的単純な構成で動くスクリプト言語(インタプリタ)を作成  
 言語仕様は C に似せて見た。  
+日本語変数、2次元配列、配列のインデックスに文字列が使えるなどの特徴がある。  
+
+テスト環境はコンソール環境でできるようにスクリプトファイルを選択して実行する形にし、昔懐かしいラインエディタを組み込んでみた。  
+
 
 ### プログラムの構成
 KLexer  :   字句解析  
 KPerse  :   構文解析  
-Program :   テスト  
+Script  :   スクリプトの実行処理  
+Program :   テスト環境  
+
 数式処理は CoreLib の YCalc.expression を呼び出す  
+
+###  実行方法
+    Script script = new Script();
+    script.mScriptFolder = mScriptFolder;   //  #includeで読み込むファイルのフォルダ
+    script.setScript(scriptCode);           //  スクリプトコードの読込(string)
+    script.execute("main");                 //  スクリプトの実行
+
+
 
 ### プロクラムの構造
     main() {                        main関数(省略可)
@@ -118,6 +132,7 @@ Program :   テスト
 
 
 ### 履歴
+2024/09/20 ラインエディタを持ったテスト環境作成
 2024/09/12 マトリックス関数追加  
 2024/08/20 2次元配列に対応  
 2024/08/18 break,continue を追加  

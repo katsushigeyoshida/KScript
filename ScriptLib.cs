@@ -1,5 +1,4 @@
 ﻿using CoreLib;
-using System.Windows;
 
 namespace KScript
 {
@@ -70,9 +69,9 @@ namespace KScript
                 case "matrixAdd": return matrixAdd(args, ret);
                 case "matrixInverse": return matrixInverse(args, ret);
                 case "copyMatrix": return copyMatrix(args, ret);
-                default: break;
+                default: return new Token("not found func", TokenType.ERROR);
             }
-            return null;
+            return new Token("", TokenType.EMPTY);
         }
 
         /// <summary>

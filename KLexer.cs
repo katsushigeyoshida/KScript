@@ -16,6 +16,8 @@
         EXPRESS,                //  数式
         FUNCTION,               //  関数
         COMMENT,                //  コメント
+        EMPTY,                  //  データなし
+        ERROR,                  //  エラー
     }
 
     //  字句データ
@@ -34,7 +36,8 @@
             '(', ')', '{', '}', '[', ']', ' ', ',', ';' };
         public static char[] skipChar = { ' ', '\t', '\r', '\n' };
         public static string[] statement = {
-            "let", "while", "if", "else", "for", "return", "break", "continue", "print" 
+            "let", "while", "if", "else", "for", "return", "break", "continue",
+            "print", "using", "#include",  
         };
 
         public string mValue;
@@ -117,7 +120,7 @@
                     buf = getBracketString(str, i, str[i]);
                     tokens.Add(new Token(buf, str[i] == '{' ? TokenType.STATEMENTS : TokenType.EXPRESS));
                     i += buf.Length - 1;
-                } else if (Char.IsLetter(str[i])) { //  アルファベットの確認(a-z,A-Z,全角も)
+                } else if (Char.IsLetter(str[i]) || str[i] == '#') { //  アルファベットの確認(a-z,A-Z,全角も)
                     //  変数名、予約語
                     while (i < str.Length && Array.IndexOf(Token.operators, str[i]) < 0
                              && Array.IndexOf(Token.delimiter, str[i]) < 0) {

@@ -105,8 +105,9 @@ namespace KScript
                             i--;
                         } else if (tokens[i].mValue == "return" ||
                             tokens[i].mValue == "break" ||
-                            tokens[i].mValue == "continue") {
-                            //  return 文,break文,continue文
+                            tokens[i].mValue == "continue" ||
+                            tokens[i].mValue == "#include") {
+                            //  return 文,break文,continue文,#include文
                             List<Token> stateList = getStatement(tokens, ++i);
                             statement.AddRange(stateList);      //  {文...}/文 処理分
                             i += stateList.Count - 1;
@@ -179,13 +180,15 @@ namespace KScript
         /// <param name="value">関数文(トークン)</param>
         public void addFunction(Token key, List<Token> func = null)
         {
-            if (!mFunctions.ContainsKey(key.mValue)) {
-                string tokens = "";
+            string tokens = "";
+            if (func != null) {
                 foreach (Token token in func)
                     tokens += token.mValue + " ";
+            }
+            if (!mFunctions.ContainsKey(key.mValue)) {
                 mFunctions.Add(key.mValue, new Token(tokens, TokenType.FUNCTION));
             } else {
-                mFunctions[key.mValue] = null;
+                mFunctions[key.mValue] = new Token(tokens, TokenType.FUNCTION);
             }
         }
     }

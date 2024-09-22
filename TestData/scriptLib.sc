@@ -1,37 +1,4 @@
-﻿//	配列計算
-print("2次元配列\n");
-a[,] = {
-    {  1,  2,  3,  4,  5 }, 
-    {  6,  7,  8,  9, 10 },
-    { 11, 12, 13, 14, 15 }
-};
-printArray2(a[,]);
-print();
-print("配列の合計、平均\n")
-x[] = { 2, 4, 7, 8, 9 }
-y[] = { 30,50, 70, 40,80 }
-printArray(x[]);
-total = sum(x[]);
-ave = average(x[]);
-vari = variance(x[]);
-print("合計 : ", total, " 平均: ", ave, "\n");
-sd = stdDev(x[]);
-print(" 分散: ", vari, " 標準偏差: ", sd, "\n");
-
-print("配列の加算\n")
-abc[] = { 2, 4, 7, 8, 9 }
-printArray(abc[]);
-print("abc[] + 2\n")
-add = 2;
-b[] = addArray(abc[], add);
-printArray(b[]);
-
-print("配列クリア\n");
-arrayClear(abc[]);
-start = 0;
-size = arraySize(abc[]);
-print("start = ", start, " size = ", size, "\n");
-
+﻿//  Script Library
 //  配列に加算関数
 addArray(array[], add) {
     start = 0;
