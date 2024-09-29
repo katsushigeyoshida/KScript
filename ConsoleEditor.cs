@@ -36,6 +36,7 @@ namespace KScript
         {
             if (!string.IsNullOrEmpty(path))
                 load(path);
+            int opeCount = 0;
             while (true) {
                 string command = "", arg = "";
                 Console.Write($"ed {PROMPT}");
@@ -51,6 +52,7 @@ namespace KScript
                     continue;
                 else if (0 == "list".IndexOf(command)) {
                     list(arg);
+                    continue;
                 } else if (0 == "add".IndexOf(command)) {
                     mScriptData.Add(arg);
                 } else if (0 == "insert".IndexOf(command)) {
@@ -59,12 +61,17 @@ namespace KScript
                     remove(arg);
                 } else if (0 == "move".IndexOf(command)) {
                     move(arg);
+                } else if (0 == "copy".IndexOf(command)) {
+                    copy(arg);
                 } else if (0 == "clear".IndexOf(command)) {
                     mScriptData.Clear();
                 } else if (0 == "search".IndexOf(command)) {
                     search(arg);
+                    continue;
                 } else if (0 == "replace".IndexOf(command)) {
                     replace(arg);
+                } else if (0 == "tab2space".IndexOf(command)) {
+                    tab2space(arg);
                 } else if (0 == "editor".IndexOf(command)) {
                     int n = ylib.intParse(arg.Trim());
                     if (0 <= n && n < mScriptData.Count) {
@@ -72,23 +79,35 @@ namespace KScript
                         Console.WriteLine();
                     }
                 } else if (0 == "execute".IndexOf(command)) {
-                    execute();
+                    execute(0 < opeCount);
+                    continue;
                 } else if (0 == "calculate".IndexOf(command)) {
                     calculate(arg);
+                    continue;
                 } else if (0 == "load".IndexOf(command)) {
                     load(arg);
+                    opeCount = 0;
+                    continue;
                 } else if (0 == "save".IndexOf(command)) {
-                    save(arg);
+                    if (0 < opeCount) {
+                        if (save(arg))
+                            opeCount = 0;
+                    }
+                    continue;
                 } else if (0 == "help".IndexOf(command)) {
                     helpEd(arg);
+                    continue;
                 } else if (0 == "quit".IndexOf(command)) {
+                    if (0 < opeCount)
+                        save("");
                     return;
                 }
+                opeCount++;
             }
         }
 
         /// <summary>
-        /// 行の移動
+        /// 行の移動(move 3,10)
         /// </summary>
         /// <param name="arg">移動前,移動後</param>
         private void move(string arg)
@@ -105,6 +124,22 @@ namespace KScript
                 mScriptData.RemoveAt(st);
             else
                 mScriptData.RemoveAt(st + 1);
+        }
+
+        /// <summary>
+        /// 行のコピー(copy 3, 10)
+        /// </summary>
+        /// <param name="arg">コピー前行,コピー後行</param>
+        private void copy(string arg)
+        {
+            int st = 0, ed = mScriptData.Count;
+            string[] no = arg.Split(',');
+            if (0 < no.Length)
+                st = ylib.intParse(no[0]);
+            if (1 < no.Length)
+                ed = ylib.intParse(no[1]);
+            string tmp = mScriptData[st];
+            mScriptData.Insert(ed, tmp);
         }
 
         /// <summary>
@@ -198,25 +233,31 @@ namespace KScript
         {
             string[] args = arg.Split(',');
             bool contFlag = false;
+            var key = new ConsoleKeyInfo();
+            ConsoleKeyInfo preKey = new ConsoleKeyInfo();
             if (2 == args.Length) {
                 for (int i = 0; i < mScriptData.Count; i++) {
                     if (0 <= mScriptData[i].IndexOf(args[0])) {
                         Console.WriteLine($"{i.ToString("D4")} {mScriptData[i]}");
                         string buf = mScriptData[i].Replace(args[0], args[1]);
-                        Console.WriteLine($"{i.ToString("D4")} {buf}");
                         if (!contFlag) {
+                            Console.WriteLine($"{i.ToString("D4")} {buf}");
                             Console.Write("y(es)/n(o)/c(ontinue)/q(uit) :");
-                            var key = Console.ReadKey();
+                            key = Console.ReadKey();
                             if (key.KeyChar == 'y' || key.KeyChar == 'Y')
                                 mScriptData[i] = buf;
-                            else if (key.KeyChar == 'n' || key.KeyChar == 'N')
-                                continue;
                             else if (key.KeyChar == 'c' || key.KeyChar == 'C') {
                                 contFlag = true;
-                                continue;
+                                key = preKey;
+                                i--;
                             } else if (key.KeyChar == 'q' || key.KeyChar == 'Q')
                                 break;
+                            preKey = key;
                             Console.WriteLine();
+                        } else {
+                            if (key.KeyChar == 'y' || key.KeyChar == 'Y')
+                                mScriptData[i] = buf;
+                            Console.WriteLine($"{i.ToString("D4")} {mScriptData[i]}");
                         }
                     }
                 }
@@ -242,10 +283,11 @@ namespace KScript
         /// <summary>
         /// スクリプトの実行
         /// </summary>
-        private void execute()
+        private void execute(bool saveOn)
         {
-            if (save(""))
-                callback();
+            if (saveOn)
+                save("");
+            callback();
             //string scriptData = string.Join("\n", mScriptData);
             //Script script = new Script(scriptData);
             //script.execute("main");
@@ -290,6 +332,27 @@ namespace KScript
         }
 
         /// <summary>
+        /// タブをスペースに変換
+        /// </summary>
+        /// <param name="arg">[開始行],[終了行]</param>
+        private void tab2space(string arg)
+        {
+            int st = 0, ed = mScriptData.Count;
+            string[] no = arg.Split(',');
+            if (0 < no.Length)
+                st = ylib.intParse(no[0]);
+            if (1 < no.Length)
+                ed = ylib.intParse(no[1]) + 1;
+            ed = Math.Min(ed, mScriptData.Count);
+            st = Math.Max(Math.Min(st, ed), 0);
+            for (int i = st; i < ed; i++) {
+                mScriptData[i] = ylib.tab2space(mScriptData[i]);
+                Console.WriteLine($"{i.ToString("D4")} {mScriptData[i]}");
+            }
+        }
+
+
+        /// <summary>
         /// 行編集
         /// </summary>
         /// <param name="prompt">プロンプト</param>
@@ -300,16 +363,22 @@ namespace KScript
             string original = buf;
             string dispStr = prompt + buf;
             int promptLen = prompt.Length;
+            int displen = ylib.getStrByteCount(dispStr);
+            Console.CursorVisible = true;
+            (int left, int top) = Console.GetCursorPosition();
             Console.Write(dispStr);
             int sp = buf.Length;
             while (true) {
                 var key = Console.ReadKey();
-                (int left, int top) = Console.GetCursorPosition();
                 switch (key.Key) {
                     case ConsoleKey.Escape: return original;
                     case ConsoleKey.Enter: return buf;
                     case ConsoleKey.LeftArrow: sp--; break;
                     case ConsoleKey.RightArrow: sp++; break;
+                    case ConsoleKey.UpArrow: break;
+                    case ConsoleKey.DownArrow: break;
+                    case ConsoleKey.Home: sp = 0; break;
+                    case ConsoleKey.End: sp = buf.Length; break;
                     case ConsoleKey.Backspace:
                         if (0 < sp) {
                             sp--;
@@ -324,11 +393,19 @@ namespace KScript
                         buf = buf.Insert(sp++, key.KeyChar.ToString());
                         break;
                 }
-                Console.Write($"\r{"".PadRight(dispStr.Length)}");
                 sp = Math.Max(0, Math.Min(sp, buf.Length));
+                Console.SetCursorPosition(0, top);
+                Console.Write($"{" ".PadLeft(displen)}");      //  前の文字列を消去して表示
                 dispStr = prompt + buf;
-                Console.Write($"\r{dispStr}");
-                Console.SetCursorPosition(promptLen + sp, top);
+                Console.SetCursorPosition(0, top);
+                Console.Write($"{dispStr}");
+                int cp = ylib.getStrByteCount(buf.Substring(0, sp)) + promptLen;    //  カーソル位置を全角文字に対応
+                int width = Console.WindowWidth;
+                displen = ylib.getStrByteCount(dispStr);
+                if (width <= displen && width <= cp) {
+                    Console.SetCursorPosition(cp - width, top + 1);
+                } else
+                    Console.SetCursorPosition(cp, top);
             }
         }
 
@@ -352,21 +429,23 @@ namespace KScript
             } else {
                 List<string> help = new List<string>() {
                     "--  editor help --",
-                    "add [文字列]              追加",
-                    "list [start,end]          行数指定のリスト表示",
-                    "insert No [文字列]        No行に挿入",
-                    "remove start[,end]        行削除",
-                    "move srcLine,destLine     行移動",
-                    "search [文字列]           検索",
-                    "replace [文字列],[文字列] 置換え",
-                    "clear                     すべて削除",
-                    "load [パス]               ファイルの読込",
-                    "save [パス]               ファイルの保存",
-                    "execute                   スクリプトの実行",
-                    "calculate [数式]          数式の計算処理",
-                    "help                      ヘルプ",
-                    "help [calc]               数式の関数ヘルプ",
-                    "quit                      終了",
+                    "add [文字列]                 追加",
+                    "list [start,end]             行数指定のリスト表示",
+                    "insert No [文字列]           No行に挿入",
+                    "remove start[,end]           行削除",
+                    "move srcLine,destLine        行移動",
+                    "copy srcLine,destLine        行コピー",
+                    "search [文字列]              検索",
+                    "replace [文字列],[文字列]    置換え",
+                    "tab3space [開始行],[終了行]  タブをスペースに変換",
+                    "clear                        すべて削除",
+                    "load [パス]                  ファイルの読込",
+                    "save [パス]                  ファイルの保存",
+                    "execute                      スクリプトの実行",
+                    "calculate [数式]             数式の計算処理",
+                    "help                         ヘルプ",
+                    "help [calc]                  数式の関数ヘルプ",
+                    "quit                         終了",
                 };
                 foreach (var str in help)
                     Console.WriteLine($"{str}");

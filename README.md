@@ -114,12 +114,24 @@ Program :   テスト環境
         array[] = { 1, 2, 3, 4, 5 }
         total = sum(array[]);
 
-### 数式処理以外の関数
+### 数式処理以外の関数(おもに配列関係)
     print(a, b, "\n");              : コンソールに文字出力  
     a = input();                    : コンソールからの入力  
-    start = arrayStart(a[]);        : 配列の開始位置  
-    size = arraySize(a[]);          : 配列のサイズ  
-    arrayClear(a[]);                : 配列をクリア  
+    c = contain(a[x]);              : 配列の有無(0:なし 1:あり)
+    size = count(a[]);              : 配列のサイズ
+    size = count(a[,]);             : 2次元配列の全体の数
+    size = count(a[1,]);            : 2次元配列(2行目)の列数
+    max = max(a[]);                 : 配列の最大値
+    min = min(a[,]);                : 配列の最小値
+    sum = sum(a[]);                 : 配列の合計
+    ave = average(a[,]);            : 配列の平均
+    vari = variance(a[]);           : 分散
+    std = stdDeviation(a[]);        : 標準偏差
+    cov = covariance(a[], b[]);     : 共分散
+    clear(a[]);                     : 配列をクリア
+    remove(a[],st[,ed]);            : 配列の要素削除(1次元のみ)
+    sort(a[]);                      : 配列のソート(1次元のみ)
+    reverse(a[]);                   : 配列の逆順化(1次元のみ)
     a[,] = unitMatrix(size);        : 単位行列  
     d[,] = matrixTranspose(a[,]);   : 転置行列  
     d[,] = matrixMulti(a[,], b[,]); : 行列の積  
@@ -127,11 +139,13 @@ Program :   テスト環境
     d[,] = matrixInverse(a[,]);     : 逆行列 a^-1  
     d[,] = copyMatrix(a[,]);        : 行列のコピー  
 
-### 数式処理 : YCalc.expression(式) を呼び出す
+### 数式処理 : CoreLib の YCalc.expression(式) を呼び出す
 
 
 
 ### 履歴
+2024/09/26 統計陽関数追加  
+2024/09/21 #include文の追加  
 2024/09/20 ラインエディタを持ったテスト環境作成
 2024/09/12 マトリックス関数追加  
 2024/08/20 2次元配列に対応  

@@ -49,6 +49,7 @@ C言語風スクリプト言語
 
 配列
     複数のデータをまとめて扱うもので[ ]の中の数値を変えて値を格納する
+    (配列のインデックスは０から始まる)
         a[0] = 10;
         a[1] = 20;
         a[2] = 30;
@@ -120,12 +121,22 @@ C言語風スクリプト言語
 
 数式処理以外の関数
     print(a, b, "\n");              : コンソールに文字出力
-    a = input();                    : コンソールからの入力
-    c = arrayContain(a[2]);         : 配列の有無(0:なし 1:あり)
-    size = arraySize(a[]);          : 配列のサイズ
-    size = arraySize(a[,]);         : 2次元配列の全体の数
-    size = arraySize(a[1,]);        : 2次元配列の2行目の数
-    arrayClear(a[]);                : 配列をクリア
+    a = input();                    : コンソールからの文字列入力
+    c = contain(a[2]);              : 配列の有無(0:なし 1:あり)
+    size = count(a[]);              : 配列のサイズ
+    size = count(a[,]);             : 2次元配列の全体の数
+    size = count(a[1,]);            : 2次元配列(2行目)の列数
+    max = max(a[]);                 : 配列の最大値
+    min = min(a[,]);                : 配列の最小値
+    sum = sum(a[]);                 : 配列の合計
+    ave = average(a[,]);            : 配列の平均
+    vari = variance(a[]);           : 分散
+    std = stdDeviation(a[]);        : 標準偏差
+    cov = covariance(a[], b[]);     : 共分散
+    clear(a[]);                     : 配列をクリア
+    remove(a[],st[,ed]);            : 配列の要素削除(1次元のみ)
+    sort(a[]);                      : 配列のソート(1次元のみ)
+    reverse(a[]);                   : 配列の逆順化(1次元のみ)
     a[,] = unitMatrix(size);        : 単位行列
     d[,] = matrixTranspose(a[,]);   : 転置行列
     d[,] = matrixMulti(a[,], b[,]); : 行列の積
@@ -150,20 +161,29 @@ C言語風スクリプト言語
 
 機能追加(検討)
     a[a,] = { 1, 2, 3, "abc" }
+    min,max,average(mean),median,variance,standard diation,
+    配列の挿入、削除、squeeze
     テキストファイルの読み書き
     多次元配列
-    グラフィック表示、グラフ表示、表の編集、3Dグラフィック表示
+    グラフィック表示、グラフ表示、表の編集、3Dグラフィック表示(Winアプリ)
     数値計算関数(行列、3次方程式、4次方程式、最小2乗法、Σx、Σx^2、Σx*y)
     Ctrl+Cによる中断機能
     デバッグ機能
     puase関数(デバッグ用,input関数で代用)
-    #includeまたはusingのようなライブラリ読込
+    時間関数、乱数関数
+    変数に.xxx()の機能(a.Length(), a.toLower()...)
+    配列変数の時(a[].sum(),a[].min(), a[].minBy()...)
+    do文,switch文
+    コレクション map,set,push
+    web関連
 
 問題点(バグ)
     コードミスのエラーが検出できない
     数式処理の中に配列引数のプログラム関数が使えない(2024/09/18)
 
 履歴
+2024/09/26 統計陽関数追加、Ctrl+Cで中断
+2024/09/21 #include文の追加
 2024/09/20 エラー処理の追加
 2024/09/20 Consoleでの編集機能追加
 2024/09/12 マトリックス関数追加
@@ -172,30 +192,34 @@ C言語風スクリプト言語
 2024/08/17 とりあえず動作するもの
 2024/08/07 作成開始
 
-おまけ
+おまけ(コンソールでのテスト環境)
 Test Program(main)のコマンド
-    quit      : 終了
-    editor    : スクリプトの編集
-    help      : ヘルプ
-    help calc : 関数ヘルプ
-    [数式]    : 数式処理
-    [CR]      : スクリプトファイルの選択
+    load            : スクリプトファイルの選択
+    list            : スクリプトの表示
+    execute [option]: スクリプトの実行([debug,console])
+    quit            : 終了
+    editor          : スクリプトの編集
+    help            : ヘルプ
+    help [calc]     : 関数ヘルプ
+    [数式]          : 数式処理
+    [CR]            : スクリプトファイルの選択
 
 editor コマンド
-    add [文字列]            追加
-    list                    リスト表示
-    list start,end          行数指定のリスト表示
-    insert No [文字列]      No行に挿入
-    remove start,end        行削除
-    search [文字列]         検索
+    add [文字列]              追加
+    list                      リスト表示
+    list start,end            行数指定のリスト表示
+    insert No [文字列]        No行に挿入
+    remove start,end          行削除
+    move line1,line2          line1からline2に移動
+    search [文字列]           検索
     replace [文字列],[文字列] 置換え
-    clear                   すべて削除
-    load [パス]             ファイルの読込
-    save [パス]             ファイルの保存
-    execute                 スクリプトの実行
-    calculate [数式]        数式の計算処理
-    help                    ヘルプ
-    quit                    終了
+    clear                     すべて削除
+    load [パス]               ファイルの読込
+    save [パス]               ファイルの保存
+    execute                   スクリプトの実行
+    calculate [数式]          数式の計算処理
+    help                      ヘルプ
+    quit                      終了
 
 数式関数一覧
     "PI             円周率",

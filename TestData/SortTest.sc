@@ -16,10 +16,9 @@ if (sortNo == 3) simpleInsert(data[]);
 if (sortNo == 4) shakerSort(data[]);
 if (sortNo == 5) simpleInsert2(data[]);
 if (sortNo == 6) shellSort(data[]);
-
 simpleSelect(a[]) {
     sp = 0;
-    ep = arraySize(a[]);
+    ep = count(a[]);
     print("単純選択法 ",ep, "\n");
     count = 0;
     n = ep;
@@ -35,11 +34,10 @@ simpleSelect(a[]) {
         arrayPrint(b[]);
     }
 }
-
 bubleSort(a[]) {
     print("バブルソート\n");
     sp = 0;
-    ep = arraySize(a[]);
+    ep = count(a[]);
     count = 0;
     for ( i = sp; i < ep; i = i +1){
         for ( j = sp; j < ep - 1; j = j + 1) {
@@ -54,11 +52,10 @@ bubleSort(a[]) {
         arrayPrint(a[]);
     }
 }
-
 simpleInsert(a[]) {
     print("単純挿入法(1列目作業データ)\n");
     sp = 0;
-    ep = arraySize(a[]);
+    ep = count(a[]);
     count = 0;
     for ( i = sp; i < ep; i = i +1){
         count++;
@@ -74,10 +71,9 @@ simpleInsert(a[]) {
         arrayPrint(b[]);
     }
 }
-
 shakerSort(a[]) {
     print("シェーカーソート\n");
-    n = arraySize(a[]);
+    n = count(a[]);
     count = 0;
     shift = 0;
     left = 0;
@@ -109,10 +105,9 @@ shakerSort(a[]) {
         arrayPrint(a[]);
     }
 }
-
 simpleInsert2(a[]) {
     print("単純挿入ソート\n");
-    n = arraySize(a[]) - 1;
+    n = count(a[]) - 1;
     count = 0;
     for (i = 1; i < n; i++) {
         for (j = i - 1; j >= 0; j--) {
@@ -129,10 +124,9 @@ simpleInsert2(a[]) {
         arrayPrint(a[]);
     }
 }
-
 shellSort(a[]) {
     print("シェルソート\n");
-    n = arraySize(a[]) - 1;
+    n = count(a[]) - 1;
     gap = floor(n / 2);
     count = 0;
     while (gap > 0) {
@@ -155,10 +149,9 @@ shellSort(a[]) {
         gap = floor(gap / 2);
     }
 }
-
 arrayPrint(b[]) {
     i = 0;
-    ep = arraySize(b[]);
+    ep = count(b[]);
     while (i < ep) {
         print(b[i], " ");
         i = i + 1;

@@ -17,6 +17,8 @@ namespace KScript
         static void Main(string[] args)
         {
             YCalc calc = new YCalc();
+            Console.Clear();
+            Console.CancelKeyPress += new ConsoleCancelEventHandler(abortHandler);
 
             Console.WriteLine("KScript Test");
             //  既定フォルダの取得
@@ -24,6 +26,7 @@ namespace KScript
             mScriptFolder = Properties.Settings.Default.DataFolder;
             if (!Directory.Exists(mScriptFolder))
                 mScriptFolder = ".";
+
             mConEditor = new ConsoleEditor(mScriptFolder, ".sc");
             mConEditor.callback = execute;
             mScript = new Script();
@@ -32,6 +35,8 @@ namespace KScript
             while (true) {
                 Console.Write($"main {PROMPT}");
                 var input = Console.ReadLine();
+                if (input == null)
+                    continue;
                 string command = "", arg = "";
                 int sp = input.IndexOf(" ");
                 if (0 < sp) {
@@ -48,13 +53,14 @@ namespace KScript
                 } else if ("addload".IndexOf(command) == 0) {
                     addFile();
                 } else if ("execute".IndexOf(command) == 0) {
-                    execute(mScriptData, mScriptFolder);
+                    execute(mScriptData, mScriptFolder, arg);
                 } else if ("quit".IndexOf(command) == 0) {
                     break;
                 } else if ("help".IndexOf(command) == 0) {
                     helpMain(arg);
                 } else if ("editor".IndexOf(command) == 0) {
                     mConEditor.editor(mScriptPath);
+                    load(mScriptPath);
                 } else if (0 < input.Length) {
                     Console.Write($" {PROMPT}");
                     Console.WriteLine(calc.expression(input.Trim()));
@@ -70,6 +76,17 @@ namespace KScript
         }
 
         /// <summary>
+        /// プログラムの中断
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="args"></param>
+        protected static void abortHandler(object sender, ConsoleCancelEventArgs args)
+        {
+            Console.WriteLine($"\n{args.SpecialKey} : Program Abort");
+            Environment.Exit(0);
+        }
+
+        /// <summary>
         /// スクリプトファイルの選択
         /// </summary>
         static void fileSelct()
@@ -77,8 +94,17 @@ namespace KScript
             //  テストファイル選択
             mScriptPath = ylib.consoleFileSelect(mScriptFolder, "*.sc");
             if (mScriptPath == null || mScriptPath == "") return;
-            mScriptFolder = Path.GetDirectoryName(mScriptPath);
-            mScriptData = ylib.loadListData(mScriptPath);
+            load(mScriptPath);
+        }
+
+        /// <summary>
+        /// ファイルを読み込む
+        /// </summary>
+        /// <param name="path"></param>
+        static void load(string path)
+        {
+            mScriptFolder = Path.GetDirectoryName(path);
+            mScriptData = ylib.loadListData(path);
         }
 
         /// <summary>
@@ -98,8 +124,19 @@ namespace KScript
         /// スクリプトの実行
         /// </summary>
         /// <param name="scriptData"></param>
-        static void execute(List<string> scriptData, string scriptFolder)
+        static void execute(List<string> scriptData, string scriptFolder, string arg = "")
         {
+            mScript.mDebug = false;
+            mScript.mDebugConsole = false;
+            if (0 < arg.Length) {
+                string[] args = arg.Split(',');
+                for (int i = 0; i < args.Length; i++) {
+                    if (0 == "debug".IndexOf(args[i].Trim()))
+                        mScript.mDebug = true;
+                    else if (0 == "console".IndexOf(args[i].Trim()))
+                        mScript.mDebugConsole = true;
+                }
+            }
             mScript.clear();
             string code = string.Join("\n", scriptData);
             mScript.mScriptFolder = scriptFolder;

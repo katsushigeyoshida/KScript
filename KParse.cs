@@ -1,6 +1,4 @@
-﻿using CoreLib;
-
-namespace KScript
+﻿namespace KScript
 {
     /// <summary>
     /// 構文解析()
@@ -12,10 +10,11 @@ namespace KScript
     /// STATEMENT 文  : while ( conditional ) { steatement; steatement; ... }
     ///                 if (conditional ) { steatement; steatement; ... } else { steatement; steatement; ... }
     ///                 for ( initial; conditional; iteration) { statement, statement... }
-    ///                 return express ;
+    ///                 return [express] ;
     ///                 break ;
     ///                 continue ;
     ///                 print( arg );
+    ///                 #include xxx;
     /// EXPRESS文     : 数式
     /// 
     /// 変数と関数の登録

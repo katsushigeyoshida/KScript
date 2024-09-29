@@ -7,7 +7,7 @@ namespace KScript
     ///     KParse で処理した構文を実行処理する
     /// 
     /// 関数の構成
-    ///   Script            スクリプトの読み込み登録
+    ///   Script            スクリプトの読み込み登録(字句・構文解析)
     ///     execute             スクリプト文の逐次処理
     ///       exeStatements         複数構文の実行
     ///         exeStatement            構文の実行
@@ -37,7 +37,7 @@ namespace KScript
     ///                 function                     数式処理関数
     /// 
     /// 関数一覧
-    /// Script(string script)                                   コンストラクタ(スクリプト文の設定)
+    /// Script(string script)                                   コンストラクタ(字句・構文解析)
     /// execute(string funcName, List<Token> arg = null)        スクリプトの実行
     /// exeStatements(List<Token> tokens, int sp)               複数の文の処理
     /// exeStatement(List<Token> tokens)                        文の処理
@@ -85,6 +85,8 @@ namespace KScript
         public KLexer mLexer = new KLexer();
         public ScriptLib mScriptLib;
         public string mScriptFolder = "";
+        public bool mDebug = false;
+        public bool mDebugConsole = false;
 
         private YCalc mCalc = new YCalc();
         private YLib ylib = new YLib();
@@ -199,7 +201,7 @@ namespace KScript
         /// <returns>実行結果</returns>
         public RETURNTYPE exeStatement(List<Token> tokens)
         {
-            //printToken("", tokens, true, true, false);
+            printToken("", tokens, true, mDebug, mDebugConsole);
             if (tokens[0].mType == TokenType.VARIABLE ||
                 tokens[0].mType == TokenType.ARRAY) {
                 return letStatement(tokens);
@@ -461,19 +463,24 @@ namespace KScript
         /// <returns></returns>
         private Token function(Token funcName, Token arg, Token ret = null)
         {
-            Token result = mScriptLib.innerFunc(funcName, arg, ret);   //  内部関数処理
-            if (result != null && result.mType != TokenType.ERROR)
-                return result;
-            if (mParse.mFunctions.ContainsKey(funcName.mValue))
-                //  プログラムの関数
-                return programFunc(funcName.mValue, arg, ret);
+            try {
+                Token result = mScriptLib.innerFunc(funcName, arg, ret);   //  内部関数処理
+                if (result != null && result.mType != TokenType.ERROR)
+                    return result;
+                if (mParse.mFunctions.ContainsKey(funcName.mValue))
+                    //  プログラムの関数
+                    return programFunc(funcName.mValue, arg, ret);
                 //  数式処理の関数
-            result = funcExpress(funcName.mValue, arg);
-            if (result == null || result.mType == TokenType.ERROR) {
+                result = funcExpress(funcName.mValue, arg);
+                if (result == null || result.mType == TokenType.ERROR) {
+                    Console.WriteLine($"Error: not found function [{funcName.mValue}]");
+                    return new Token(funcName.mValue, TokenType.ERROR);
+                }
+                return result;
+            } catch (Exception e) {
                 Console.WriteLine($"Error: not found function [{funcName.mValue}]");
                 return new Token(funcName.mValue, TokenType.ERROR);
             }
-            return result;
         }
 
         /// <summary>
@@ -509,40 +516,45 @@ namespace KScript
         /// <returns>処理結果</returns>
         public bool conditinalStatement(List<Token> tokens, int sp = 0)
         {
-            if (2 < tokens.Count && tokens[1].mType != TokenType.CONDITINAL)
-                tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[sp].mValue));
-            else if (tokens.Count == 1)
-                tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[0].mValue));
+            try {
+                if (2 < tokens.Count && tokens[1].mType != TokenType.CONDITINAL)
+                    tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[sp].mValue));
+                else if (tokens.Count == 1)
+                    tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[0].mValue));
 
-            List<Token> a = new List<Token>();
-            List<Token> b = new List<Token>();
-            int n = 0;
-            while (n < tokens.Count && tokens[n].mType != TokenType.CONDITINAL)
-                a.Add(tokens[n++]);
-            if (n == tokens.Count) return false;        //  Error
-            Token cond = tokens[n++];
-            while (n < tokens.Count && tokens[n].mType != TokenType.DELIMITER)
-                b.Add(tokens[n++]);
-            switch (cond.mValue) {
-                case "||": return conditinalStatement(a) || conditinalStatement(b);
-                case "&&": return conditinalStatement(a) && conditinalStatement(b);
-                case "!": return !conditinalStatement(b);
-            }
+                List<Token> a = new List<Token>();
+                List<Token> b = new List<Token>();
+                int n = 0;
+                while (n < tokens.Count && tokens[n].mType != TokenType.CONDITINAL)
+                    a.Add(tokens[n++]);
+                if (n == tokens.Count) return false;        //  Error
+                Token cond = tokens[n++];
+                while (n < tokens.Count && tokens[n].mType != TokenType.DELIMITER)
+                    b.Add(tokens[n++]);
+                switch (cond.mValue) {
+                    case "||": return conditinalStatement(a) || conditinalStatement(b);
+                    case "&&": return conditinalStatement(a) && conditinalStatement(b);
+                    case "!": return !conditinalStatement(b);
+                }
 
-            double avalue = double.Parse(express(a, 0).mValue);
-            double bvalue = double.Parse(express(b, 0).mValue);
-            switch (cond.mValue) {
-                case "==": return avalue == bvalue;
-                case "!=": return avalue != bvalue;
-                case "<": return avalue < bvalue;
-                case ">": return avalue > bvalue;
-                case "<=": return avalue <= bvalue;
-                case ">=": return avalue >= bvalue;
-                default:    //  Error
-                    Console.WriteLine($"ERROR: not conditional code [{cond.mValue}]");
-                    break;
+                double avalue = ylib.doubleParse(express(a, 0).mValue);
+                double bvalue = ylib.doubleParse(express(b, 0).mValue);
+                switch (cond.mValue) {
+                    case "==": return avalue == bvalue;
+                    case "!=": return avalue != bvalue;
+                    case "<": return avalue < bvalue;
+                    case ">": return avalue > bvalue;
+                    case "<=": return avalue <= bvalue;
+                    case ">=": return avalue >= bvalue;
+                    default:    //  Error
+                        Console.WriteLine($"ERROR: not conditional code [{cond.mValue}]");
+                        break;
+                }
+                return false;
+            } catch (Exception e) {
+                Console.WriteLine($"ERROR: conditional Statement [{e.Message}]");
+                return false;
             }
-            return false;
         }
 
         /// <summary>
@@ -589,10 +601,10 @@ namespace KScript
                 } else {
                     //  ERROR
                     Console.WriteLine($"ERROR: not express word [{tokens[i]}]");
-                    break;
+                    return new Token("", TokenType.ERROR);
                 }
-                if (token == null)
-                    return null;
+                if (token == null || token.mType == TokenType.ERROR)
+                    return new Token("", TokenType.ERROR);
                 if (buf == null) {
                     buf = token.copy();
                 } else if (buf.mType == TokenType.STRING || token.mType == TokenType.STRING) {
@@ -921,7 +933,7 @@ namespace KScript
         }
         
         /// <summary>
-        /// デバッグ用トークンリストの文字列か
+        /// デバッグ用トークンリストの文字列化
         /// </summary>
         /// <param name="tokens">トークンリスト</param>
         /// <returns>文字列</returns>
