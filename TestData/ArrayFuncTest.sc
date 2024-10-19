@@ -29,6 +29,7 @@ clear(abc[]);
 start = 0;
 size = count(abc[]);
 print("start = ", start, " size = ", size, "\n");
+
 //  配列に加算関数
 addArray(array[], add) {
     start = 0;

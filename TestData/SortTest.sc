@@ -8,14 +8,16 @@ print("3:単純挿入法\n");
 print("4:シェーカーソート\n");
 print("5:単純挿入法2\n");
 print("6: シェルソート\n");
+print("7: クイックソート\n");
 sortNo = input();
 arrayPrint(data[]);
 if (sortNo == 1) simpleSelect(data[]);
-if (sortNo == 2) bubleSort(data[]);
-if (sortNo == 3) simpleInsert(data[]);
-if (sortNo == 4) shakerSort(data[]);
-if (sortNo == 5) simpleInsert2(data[]);
-if (sortNo == 6) shellSort(data[]);
+else if (sortNo == 2) bubleSort(data[]);
+else if (sortNo == 3) simpleInsert(data[]);
+else if (sortNo == 4) shakerSort(data[]);
+else if (sortNo == 5) simpleInsert2(data[]);
+else if (sortNo == 6) shellSort(data[]);
+else if (sortNo == 7) quickSort(data[]);
 simpleSelect(a[]) {
     sp = 0;
     ep = count(a[]);
@@ -149,6 +151,37 @@ shellSort(a[]) {
         gap = floor(gap / 2);
     }
 }
+
+quickSort(a[]) {
+    println("クイックソート");
+	n = count(a[]) - 1;
+	a[] = quick(a[], 0, n);
+}
+
+quick(a[], left, right) {
+	if (left < right) {
+		print(left, " ", right, " : ");
+		arrayPrint(a[]);
+		s = a[left];
+		i = left;
+		j = right + 1;
+		while (1) {
+			while (a[++i] < s) ;
+			while (a[--j] > s) ;
+			if (i >= j) break;
+			t = a[i];
+			a[i] = a[j];
+			a[j] = t;
+		}
+		a[left] = a[j];
+		a[j] = s;
+		
+		a[] = quick(a[], left, j - 1);
+		a[] = quick(a[], j + 1, right);
+	}
+	return a[];
+}
+
 arrayPrint(b[]) {
     i = 0;
     ep = count(b[]);

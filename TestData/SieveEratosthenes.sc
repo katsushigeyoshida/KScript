@@ -1,7 +1,9 @@
 ﻿//	配列テスト
 print("エラトステネスの篩\n");
 print("最大数 >> ");
-max = input();
+//max = input();
+
+max = 50;
 m = 2;
 while (m < sqrt(max)) {
     m = m + 1;

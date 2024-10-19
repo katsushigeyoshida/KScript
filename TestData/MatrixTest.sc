@@ -29,6 +29,7 @@ print("逆行列 a^-1\n");
 clear(d[,]);
 d[,] = matrixInverse(a[,]);
 printArray2(d[,]);
+
 //  最小二乗法
 //  2D配列表示
 printArray2(array[,]) {
