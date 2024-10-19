@@ -2,6 +2,13 @@
 
 namespace KScript
 {
+    public class ControlData
+    {
+        public string mOutputString = "";
+        public bool mAbort = false;
+        public bool mPause = false;
+    }
+
     /// <summary>
     /// スクリプトの処理
     ///     KParse で処理した構文を実行処理する
@@ -70,12 +77,25 @@ namespace KScript
     /// getFuncArray(Token src, Token dest, Script parse)       プログラム関数の戻り値受け渡し
     /// setFuncArray(Token src, Token dest, Script script)      プログラム関数の引数受け渡し
     /// 
+    /// outputString(string str = "\n")                         表示出力(callbackを呼び出す)
     /// printToken(string title, List<Token> tokens, bool type = false, bool debug = false, bool console = false)
     /// tokensString(List<Token> tokens)                        デバッグ用トークンリストの文字列か
     /// 
     /// </summary>
     public class Script
     {
+        public static string[] mStatmantHelp = {
+            "while (条件文){ 処理; }; : 処理の繰返し",
+            "if (条件文) { 処理A; } else { 処理B; } : 処理の分岐",
+            "for (初期値; 条件; 更新処理) { 処理; } : 決まった回数の繰返し",
+            "return 戻り値; : 戻り値の指定",
+            "break; : 繰り返し処理の中断",
+            "continue; : 繰返し処理の先頭に戻る",
+            "print(出力); : 値の出力",
+            "println(出力); : 値の出力(末尾に改行追加)",
+            "#include \"ファイル\"; : ファイル読込による機能追加",
+        };
+
         public enum RETURNTYPE { NORMAL, CONTINUE, BREAK, RETURN, ERROR }
 
         public List<Token> mTokenList = new List<Token>();
@@ -87,6 +107,9 @@ namespace KScript
         public string mScriptFolder = "";
         public bool mDebug = false;
         public bool mDebugConsole = false;
+
+        public Action printCallback;                            //  print文のコールバック関数
+        public ControlData mControlData = new ControlData();    //  データを参照渡しするため
 
         private YCalc mCalc = new YCalc();
         private YLib ylib = new YLib();
@@ -105,6 +128,8 @@ namespace KScript
         /// <param name="script">スクリプト文</param>
         public Script(string script)
         {
+            //  初期化
+            clear();
             mScriptLib = new ScriptLib(this, mParse.mVariables);
             //  字句解析・ スクリプト登録(mFunctionsに登録)
             mTokenList = mLexer.tokenList(script);
@@ -127,7 +152,7 @@ namespace KScript
         /// <param name="script">スクリプト文</param>
         public void setScript(string script)
         {
-            mStatements.Clear();
+            clear();
             addScript(script);
         }
 
@@ -208,6 +233,8 @@ namespace KScript
             } else if (tokens[0].mType == TokenType.STATEMENT) {
                 if (tokens[0].mValue == "print") {
                     printStatement(tokens);
+                } else if (tokens[0].mValue == "println") {
+                    printStatement(tokens, true);
                 } else if (tokens[0].mValue == "if") {
                     return ifStatement(tokens);
                 } else if (tokens[0].mValue == "while") {
@@ -224,7 +251,7 @@ namespace KScript
                 } else if (tokens[0].mValue == "#include") {
                     return includeStatemant(tokens);
                 } else {
-                    Console.WriteLine($"Error: not found statement [{tokensString(tokens)}]");
+                    outputString($"Error: not found statement [{tokensString(tokens)}]\n");
                     return RETURNTYPE.ERROR;
                 }
             } else if (tokens[0].mType == TokenType.FUNCTION) {
@@ -232,7 +259,7 @@ namespace KScript
             } else if (tokens[0].mType == TokenType.COMMENT) {
                 System.Diagnostics.Debug.WriteLine($"Comment: {tokens[0].mValue} ");
             } else {
-                Console.WriteLine($"Error: not found statement [{tokensString(tokens)}]");
+                outputString($"Error: not found statement [{tokensString(tokens)}]\n");
                 return RETURNTYPE.ERROR;
             }
             return RETURNTYPE.NORMAL;
@@ -253,7 +280,7 @@ namespace KScript
                 addScript(code);
                 return RETURNTYPE.NORMAL;
             } else {
-                Console.WriteLine($"Error: not exists file [{scriptPath}]");
+                outputString($"Error: not exists file [{scriptPath}]\n");
                 return RETURNTYPE.ERROR;
             }
         }
@@ -275,7 +302,7 @@ namespace KScript
                     } else if (tokens[2].mType == TokenType.FUNCTION) {
                         return funcStatement(tokens, 2, tokens[0]);
                     } else {
-                        Console.WriteLine($"Error: {tokensString(tokens)}");
+                        outputString($"Error: {tokensString(tokens)}\n");
                         return RETURNTYPE.ERROR;
                     }
                     return RETURNTYPE.NORMAL;
@@ -285,7 +312,7 @@ namespace KScript
                     variable = getArrayVariable(tokens[0]);
                     expressList.AddRange(tokens.Skip(2));
                 } else {
-                    Console.WriteLine($"Error: {tokensString(tokens)}");
+                    outputString($"Error: {tokensString(tokens)}\n");
                     return RETURNTYPE.ERROR;
                 }
                 if (tokens[1].mType == TokenType.ASSIGNMENT) {
@@ -300,13 +327,13 @@ namespace KScript
                                 return RETURNTYPE.ERROR;
                         }
                         expressList = new List<Token>(){
-                            tokens[0], 
+                            tokens[0],
                             new Token(tokens[1].mValue[0].ToString(), TokenType.OPERATOR),
                             token
                         };
                     }
                 } else {
-                    Console.WriteLine($"Error: {tokensString(tokens)}");
+                    outputString($"Error: {tokensString(tokens)}\n");
                     return RETURNTYPE.ERROR;
                 }
                 Token value = express(expressList);
@@ -324,18 +351,27 @@ namespace KScript
         /// <returns>実行結果</returns>
         public RETURNTYPE ifStatement(List<Token> tokens)
         {
-            if (conditinalStatement(tokens, 1)) {
-                List<Token> tokenList = mParse.getStatement(tokens, 2);
-                return exeStatements(tokenList, 0);
-            } else {
-                int n = tokens.FindIndex(p => p.mValue == "else");
-                if (0 < n) {
-                    List<Token> tokenList = mParse.getStatement(tokens, n + 1);
+            List<Token> statment, tokenList;
+            int n = tokens.FindIndex(p => p.mValue == "else");
+            while (0 <= n) {
+                statment = tokens.Take(n).ToList();    //  if ... (else)
+                if (0 == statment.Count || statment[0].mValue != "if") break;
+                if (conditinalStatement(statment, 1)) {
+                    tokenList = mParse.getStatement(statment, 2);
                     return exeStatements(tokenList, 0);
                 }
+                tokens = tokens.Skip(n + 1).ToList();
+                n = tokens.FindIndex(p => p.mValue == "else");
             }
-            //calcError("ifStatement", tokens);
-            return RETURNTYPE.NORMAL;
+            if (0 < tokens.Count && tokens[0].mValue == "if") {
+                if (conditinalStatement(tokens, 1)) {
+                    tokenList = mParse.getStatement(tokens, 2);
+                    return exeStatements(tokenList, 0);
+                } else
+                    return RETURNTYPE.NORMAL;
+            }
+            tokenList = mParse.getStatement(tokens);
+            return exeStatements(tokenList, 0);
         }
 
         /// <summary>
@@ -384,37 +420,40 @@ namespace KScript
         /// print文の処理
         /// </summary>
         /// <param name="tokens">トークンリスト</param>
-        public RETURNTYPE printStatement(List<Token> tokens)
+        public RETURNTYPE printStatement(List<Token> tokens, bool lf = false)
         {
             if (tokens.Count <= 1) {
                 //  データなし改行のみ
-                Console.WriteLine();
+                outputString();
             } else if (tokens[1].mType == TokenType.EXPRESS) {
                 List<Token> tokenList = mLexer.tokenList(mLexer.stripBracketString(tokens[1].mValue));
                 if (tokenList == null || tokenList.Count == 0) {
                     //  データなし改行のみ
-                    Console.WriteLine();
+                    outputString();
                 } else {
                     //  コンマ区切りのデータ表示
                     List<Token> expList = new List<Token>();
+                    string buf = "";
                     for (int i = 0; i < tokenList.Count; i++) {
                         if (tokenList[i].mType == TokenType.DELIMITER) {
-                            Console.Write(express(expList).mValue);
+                            buf += express(expList).mValue;
                             expList = new List<Token>();
                         } else if (i == tokenList.Count - 1) {
                             expList.Add(tokenList[i]);
-                            Console.Write(express(expList).mValue);
+                            buf += express(expList).mValue;
                         } else {
                             expList.Add(tokenList[i]);
                         }
                     }
+                    if (0 < buf.Length)
+                        outputString(lf ? buf + "\n" : buf);
                 }
             } else if (tokens[1].mType == TokenType.STRING) {
                 string buf = tokens[1].mValue.Replace("\\n", "\n");
-                Console.Write(buf);
+                outputString(buf);
             } else {
                 //  Error
-                Console.WriteLine($"Error: printStatement [{tokens[1]}]");
+                outputString($"Error: printStatement [{tokens[1]}]\n");
                 return RETURNTYPE.ERROR;
             }
             return RETURNTYPE.NORMAL;
@@ -430,7 +469,7 @@ namespace KScript
             if (0 <= tokens[1].mValue.IndexOf("[]") || 0 <= tokens[1].mValue.IndexOf("[,]"))
                 token = tokens[1].copy();
             else
-               token = express(tokens, 1);
+                token = express(tokens, 1);
             mParse.addVariable(new Token("return", TokenType.VARIABLE), token);
 
             return RETURNTYPE.NORMAL;
@@ -473,12 +512,12 @@ namespace KScript
                 //  数式処理の関数
                 result = funcExpress(funcName.mValue, arg);
                 if (result == null || result.mType == TokenType.ERROR) {
-                    Console.WriteLine($"Error: not found function [{funcName.mValue}]");
+                    outputString($"Error: not found function [{funcName.mValue}]\n");
                     return new Token(funcName.mValue, TokenType.ERROR);
                 }
                 return result;
             } catch (Exception e) {
-                Console.WriteLine($"Error: not found function [{funcName.mValue}]");
+                outputString($"Error: not found function [{funcName.mValue}]\n");
                 return new Token(funcName.mValue, TokenType.ERROR);
             }
         }
@@ -493,13 +532,13 @@ namespace KScript
         private Token programFunc(string funcName, Token arg, Token ret)
         {
             Script script = new Script(mParse.mFunctions[funcName].mValue);
-            //  参照関数の設定
-            script.mParse.mFunctions = mParse.mFunctions;
-            //  引数の変換
-            List<Token> srcArgs = getFuncArgs(arg.mValue);
-            List<Token> outArgs = getFuncArgs(mParse.mFunctions[funcName].mValue, 1);
-            setFuncArg(srcArgs, outArgs, script);
-            script.execute(funcName, null);
+            script.mControlData = mControlData;
+            script.printCallback = printCallback;
+            script.mParse.mFunctions = mParse.mFunctions;       //  参照関数の設定
+            List<Token> callArgs = getFuncArgs(arg.mValue);     //  呼出し側引数の取得(配列以外は数値に変換)
+            List<Token> funcArgs = getFuncArgNames(mParse.mFunctions[funcName].mValue, 1);  //  関数側引数名の取得
+            setFuncArg(callArgs, funcArgs, script);             //  呼出し側から関数側に値を渡す
+            script.execute(funcName, null);                     //  関数の実行
             //  戻り値の設定
             if (script.mParse.mVariables.ContainsKey("return")) {
                 getFuncArray(script.mParse.mVariables["return"], ret, script);
@@ -521,6 +560,9 @@ namespace KScript
                     tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[sp].mValue));
                 else if (tokens.Count == 1)
                     tokens = mLexer.tokenList(mLexer.stripBracketString(tokens[0].mValue));
+
+                if (tokens.Count == 1) return true;     //  条件式が定数の場合
+                if (tokens.Count == 2) return false;    //  条件式意味不明
 
                 List<Token> a = new List<Token>();
                 List<Token> b = new List<Token>();
@@ -547,12 +589,12 @@ namespace KScript
                     case "<=": return avalue <= bvalue;
                     case ">=": return avalue >= bvalue;
                     default:    //  Error
-                        Console.WriteLine($"ERROR: not conditional code [{cond.mValue}]");
+                        outputString($"ERROR: not conditional code [{cond.mValue}]\n");
                         break;
                 }
                 return false;
             } catch (Exception e) {
-                Console.WriteLine($"ERROR: conditional Statement [{e.Message}]");
+                outputString($"ERROR: conditional Statement [{e.Message}]\n");
                 return false;
             }
         }
@@ -590,6 +632,10 @@ namespace KScript
                         token = getVariable(token);
                 } else if (tokens[i].mType == TokenType.STRING) {
                     token = tokens[i].copy();
+                } else if (tokens[i].mType == TokenType.CONSTANT) {
+                    token = tokens[i].copy();
+                    token.mValue = mCalc.expression(token.mValue).ToString();
+                    token.mType = TokenType.LITERAL;
                 } else if (tokens[i].mType == TokenType.EXPRESS) {
                     List<Token> tokenList = mLexer.tokenList(mLexer.stripBracketString(tokens[i].mValue));
                     token = express(tokenList);
@@ -598,16 +644,41 @@ namespace KScript
                     i++;
                 } else if (tokens[i].mType == TokenType.OPERATOR) {
                     token = tokens[i].copy();
+                } else if (tokens[i].mType == TokenType.ASSIGNMENT) {
+                    token = tokens[i].copy();
+                    if (tokens[i].mValue[1] == '=') {
+                        token.mValue = tokens[i].mValue[0].ToString() + getVariable(tokens[i - 1]).mValue;
+                    } else {
+                        token.mValue = tokens[i].mValue[0].ToString() + "1";
+                    }
                 } else {
                     //  ERROR
-                    Console.WriteLine($"ERROR: not express word [{tokens[i]}]");
+                    outputString($"ERROR: not express word [{tokens[i]}]\n");
                     return new Token("", TokenType.ERROR);
                 }
                 if (token == null || token.mType == TokenType.ERROR)
                     return new Token("", TokenType.ERROR);
-                if (buf == null) {
+                if (buf == null && token.mType != TokenType.ASSIGNMENT) {
                     buf = token.copy();
+                } else if (token.mType == TokenType.ASSIGNMENT) {
+                    Token tmpValue, tmpKey;
+                    if (0 < i && tokens[i - 1].mType == TokenType.VARIABLE)
+                        tmpKey = tokens[i - 1];
+                    else
+                        tmpKey = tokens[i + 1];
+                    tmpValue = getVariable(tmpKey);
+                    tmpValue.mValue += token.mValue;
+                    tmpValue.mValue = mCalc.expression(tmpValue.mValue).ToString();
+                    tmpValue.mType = TokenType.LITERAL;
+                    if (i + 1 < tokens.Count && tokens[i + 1].mType == TokenType.VARIABLE) {
+                        buf = tmpValue.copy();
+                        i++;
+                    } else if (tokens[i].mValue[1] == '=')
+                        i++;
+                    mParse.addVariable(tmpKey, tmpValue);
                 } else if (buf.mType == TokenType.STRING || token.mType == TokenType.STRING) {
+                    if (0 < i && tokens[i - 1].mType == TokenType.OPERATOR)
+                        buf.mValue = buf.mValue.Remove(buf.mValue.Length - 1);
                     buf.mValue += token.mValue;
                     buf.mType = TokenType.STRING;
                 } else if (token.mType == TokenType.OPERATOR) {
@@ -619,7 +690,10 @@ namespace KScript
                     buf.mType = TokenType.LITERAL;
                 }
             }
-            return buf.copy();
+            if (buf != null)
+                return buf.copy();
+            else
+                return new Token("Error: express", TokenType.ERROR);
         }
 
         /// <summary>
@@ -631,14 +705,18 @@ namespace KScript
         private Token funcExpress(string funcName, Token arg)
         {
             List<Token> argValue = cnvArgList(arg);
+            if (argValue == null) {
+                outputString($"Error: funcExpress [{funcName}]\n");
+                return new Token("", TokenType.ERROR);
+            }
             string buf = "";
             foreach (Token token in argValue)
                 buf += express(token).mValue + ",";
             buf = buf.TrimEnd(',');
             string result = mCalc.expression($"{funcName}({buf})").ToString();
             if (mCalc.mError) {
-                Console.WriteLine($"Error: funcExpress [{mCalc.mErrorMsg}]");
-                return null;
+                outputString($"Error: funcExpress [{mCalc.mErrorMsg}]\n");
+                return new Token("", TokenType.ERROR); ;
             }
             return new Token(result, TokenType.LITERAL);
         }
@@ -651,7 +729,9 @@ namespace KScript
         private List<Token> cnvArgList(Token arg)
         {
             List<Token> argValue = new List<Token>();
-            if (arg.mType == TokenType.EXPRESS) {
+            if (arg.mValue == null || arg.mValue == "") {
+                argValue.Add(new Token("Error: cnvArgList", TokenType.ERROR));
+            } else if (arg.mType == TokenType.EXPRESS && 0 > arg.mValue.IndexOf(',')) {
                 argValue.Add(express(new Token(arg.mValue.Trim(), TokenType.EXPRESS)));
             } else {
                 List<string> args = mLexer.commaSplit(mLexer.stripBracketString(arg.mValue, '('));
@@ -678,7 +758,23 @@ namespace KScript
             List<Token> funcList = mParse.getStatement(mLexer.tokenList(func));
             List<string> funcargs = mLexer.commaSplit(mLexer.stripBracketString(funcList[sp].mValue, '('));
             for (int i = 0; i < funcargs.Count; i++)
-                args.Add(new Token(funcargs[i].Trim(), TokenType.VARIABLE));
+                args.Add(getValueToken(funcargs[i].Trim()));
+            return args;
+        }
+
+        /// <summary>
+        /// プログラム関数の引数名の取得
+        /// </summary>
+        /// <param name="func">関数スクリプト</param>
+        /// <param name="sp">引数の位置</param>
+        /// <returns>引数名リスト</returns>
+        private List<Token> getFuncArgNames(string func, int sp = 0)
+        {
+            List<Token> args = new List<Token>();
+            List<Token> funcList = mParse.getStatement(mLexer.tokenList(func));
+            List<string> funcargs = mLexer.commaSplit(mLexer.stripBracketString(funcList[sp].mValue, '('));
+            for (int i = 0; i < funcargs.Count; i++)
+                args.Add(mLexer.string2Token(funcargs[i].Trim()));
             return args;
         }
 
@@ -725,6 +821,8 @@ namespace KScript
 
         /// <summary>
         /// 変数または配列変数を数値に変換
+        /// m + 2 →  3 + 2 → 5
+        /// a[m, n+1] → a[2,3+1] → a[2,4] → 5
         /// </summary>
         /// <param name="value">変数または配列変数</param>
         /// <returns>数値</returns>
@@ -733,6 +831,7 @@ namespace KScript
             string buf = "";
             int sp = value.IndexOf("[");
             if (0 <= sp) {
+                //  配列引数
                 List<Token> tokens = mLexer.splitArgList(value);
                 buf = tokens[0].mValue;
                 for (int i = 1; i < tokens.Count; i++) {
@@ -744,7 +843,8 @@ namespace KScript
                     }
                 }
             } else {
-                buf = express(new Token(value, TokenType.VARIABLE)).mValue;
+                //  通常の引数
+                buf = express(mLexer.string2Token(value)).mValue.Trim();
             }
 
             if (mParse.mVariables.ContainsKey(buf))
@@ -758,7 +858,7 @@ namespace KScript
         /// </summary>
         /// <param name="token">変数名</param>
         /// <returns>変数名</returns>
-        private Token getArrayVariable(Token token) 
+        private Token getArrayVariable(Token token)
         {
             char[] sep = new char[] { '[', ']' };
             if (0 > token.mValue.IndexOf("[")) {
@@ -819,8 +919,8 @@ namespace KScript
             List<Token> datas = mLexer.tokenList(str);
             List<List<Token>> dataList = mLexer.tokensList(datas);
             for (int i = 0; i < dataList.Count; i++) {
-                    string buf = $"{arrayName}[{i}]";
-                    mParse.addVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
+                string buf = $"{arrayName}[{i}]";
+                mParse.addVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
             }
             return true;
         }
@@ -908,6 +1008,17 @@ namespace KScript
         }
 
         /// <summary>
+        /// 表示出力(callbackを呼び出す)
+        /// </summary>
+        /// <param name="str"></param>
+        public void outputString(string str = "\n")
+        {
+            mControlData.mOutputString = str;
+            //printCallback();
+            Console.Write(str);
+        }
+
+        /// <summary>
         /// デバッグ用トークンリスト表示
         /// </summary>
         /// <param name="title">タイトル</param>
@@ -920,18 +1031,18 @@ namespace KScript
             if (!debug) return;
             if (!console) {
                 System.Diagnostics.Debug.Write($"{title} ");
-                if (type) 
+                if (type)
                     tokens.ForEach(p => System.Diagnostics.Debug.Write($"{p} "));
                 else
                     tokens.ForEach(p => System.Diagnostics.Debug.Write($"{p.mValue} "));
                 System.Diagnostics.Debug.WriteLine("");
             } else {
-                Console.Write($"{title} ");
-                tokens.ForEach(p => Console.Write($"{p.mValue} "));
-                Console.WriteLine("");
+                outputString($"{title} ");
+                tokens.ForEach(p => outputString($"{p.mValue} "));
+                outputString("\n");
             }
         }
-        
+
         /// <summary>
         /// デバッグ用トークンリストの文字列化
         /// </summary>

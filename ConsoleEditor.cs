@@ -437,7 +437,7 @@ namespace KScript
                     "copy srcLine,destLine        行コピー",
                     "search [文字列]              検索",
                     "replace [文字列],[文字列]    置換え",
-                    "tab3space [開始行],[終了行]  タブをスペースに変換",
+                    "tab2space [開始行],[終了行]  タブをスペースに変換",
                     "clear                        すべて削除",
                     "load [パス]                  ファイルの読込",
                     "save [パス]                  ファイルの保存",

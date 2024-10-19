@@ -1,4 +1,6 @@
-﻿namespace KScript
+﻿using CoreLib;
+
+namespace KScript
 {
     //  字句の種類
     public enum TokenType
@@ -11,6 +13,7 @@
         DELIMITER,              //  区切り文字((,),{,},[,],;,',',)
         LITERAL,                //  固定値(数値)
         STRING,                 //  固定値(文字列)
+        CONSTANT,               //  定数
         STATEMENT,              //  文
         STATEMENTS,             //  複数の文
         EXPRESS,                //  数式
@@ -24,12 +27,12 @@
     public class Token
     {
         public static string[] comment = { "//", "/*", "*/" };
-        public static string[] condition = { 
-            "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!" 
+        public static string[] condition = {
+            "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!"
         };
         public static string[] assignment = {
             "=", "++", "--", "+=", "-=", "*=", "/=", "^=" };
-        public static char[] operators = { 
+        public static char[] operators = {
             '=', '+', '-', '*', '/', '%', '^', '!', '<', '>', '&', '|'
         };
         public static char[] delimiter = {
@@ -37,8 +40,9 @@
         public static char[] skipChar = { ' ', '\t', '\r', '\n' };
         public static string[] statement = {
             "let", "while", "if", "else", "for", "return", "break", "continue",
-            "print", "using", "#include",  
+            "print", "println", "using", "#include",
         };
+        public static string[] constatnt = { "PI", "E" };
 
         public string mValue;
         public TokenType mType;
@@ -72,6 +76,7 @@
     /// 配列      (ARRAY)       : (VARIABLE)'['*']'
     /// 数値      (LITERAL)     : [0..9|.|+|-][0..9|.]
     /// 文字列    (STRING)      : "..."
+    /// 定数      (CONSTAT)     : PI,E
     /// 演算子    (OPERATOR)    : +|-|*|/|%|^|!
     /// 代入演算子(ASSIGNMENT)  : =|+=|-=|*=|/=|^=|++|--
     /// 条件演算子(CONDITINAL)  : ==|!=|<|>|<=|>=
@@ -129,7 +134,7 @@
                         i++;
                     }
                     while (i < str.Length && str[i] == ' ') i++;    //  空白削除
-                    if (0 <= Array.IndexOf(Token.statement, buf)) {
+                    if (Token.statement.Contains(buf)) {
                         //  STATEMENT
                         tokens.Add(new Token(buf, TokenType.STATEMENT));
                     } else if (i < str.Length && str[i] == '[') {
@@ -141,11 +146,18 @@
                     } else if (i < str.Length && str[i] == '(') {
                         //  FUNCTION
                         tokens.Add(new Token(buf, TokenType.FUNCTION));
+                    } else if (Token.constatnt.Contains( buf)) {
+                        //  CONSTATNT
+                        tokens.Add(new Token(buf, TokenType.CONSTANT));
                     } else {
                         //  VARIABLE
                         tokens.Add(new Token(buf, TokenType.VARIABLE));
                     }
                     i--;
+                } else if (twoChar != "" && 0 <= Array.IndexOf(Token.assignment, twoChar)) {
+                    //  複合演算子
+                    tokens.Add(new Token(twoChar, TokenType.ASSIGNMENT));
+                    i++;
                 } else if (Char.IsNumber(str[i]) || str[i] == '.' ||
                     (i == 0 && (str[i] == '-' || str[i] == '+'))) {
                     //  数値
@@ -165,10 +177,6 @@
                     buf = stripBracketString(buf, str[i]);
                     buf = buf.Replace("\\n", "\n");
                     tokens.Add(new Token(buf, TokenType.STRING));
-                } else if (twoChar != "" && 0 <= Array.IndexOf(Token.assignment, twoChar)) {
-                    //  複合演算子
-                    tokens.Add(new Token(twoChar, TokenType.ASSIGNMENT));
-                    i++;
                 } else if (0 <= Array.IndexOf(Token.operators, str[i])) {
                     //  識別子(演算子/条件演算子)
                     if (twoChar != "" && 0 <= Array.IndexOf(Token.condition, twoChar)) {
@@ -364,6 +372,41 @@
             if (0 < buf.Length)
                 argList.Add(new Token(buf, TokenType.VARIABLE));
             return argList;
+        }
+
+        /// <summary>
+        /// 文字列をTokenに変換する
+        /// </summary>
+        /// <param name="str">文字列</param>
+        /// <returns>Token</returns>
+        public Token string2Token(string str)
+        {
+            if (0 <= str.IndexOf(','))
+                return new Token(str, TokenType.VARIABLE);
+            foreach (var func in YCalc.mKeyWord) {
+                if (1 < func.Length && 0 <= str.IndexOf(func))
+                    return new Token(str, TokenType.EXPRESS);
+            }
+            foreach (var ope in Token.operators) {
+                if (0 <= str.IndexOf(ope))
+                    return new Token(str, TokenType.EXPRESS);
+            }
+            foreach (var ope in Token.assignment) {
+                if (0 <= str.IndexOf(ope))
+                    return new Token(str, TokenType.EXPRESS);
+            }
+            foreach (var ope in Token.condition) {
+                if (0 <= str.IndexOf(ope))
+                    return new Token(str, TokenType.EXPRESS);
+            }
+            foreach (var ope in Token.statement) {
+                if (0 <= str.IndexOf(ope))
+                    return new Token(str, TokenType.STATEMENT);
+            }
+            if (0 <= str.IndexOf('('))
+                return new Token(str, TokenType.FUNCTION);
+
+            return new Token(str, TokenType.VARIABLE);
         }
     }
 }

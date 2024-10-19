@@ -14,6 +14,7 @@
     ///                 break ;
     ///                 continue ;
     ///                 print( arg );
+    ///                 println( arg );
     ///                 #include xxx;
     /// EXPRESS文     : 数式
     /// 
@@ -52,6 +53,7 @@
                 switch (tokens[i].mType) {
                     case TokenType.VARIABLE:
                     case TokenType.ARRAY:
+                    case TokenType.CONSTANT:
                     case TokenType.EXPRESS:
                         //  代入文 (変数 = 数式 ;) 条件文 (変数/式 条件演算子 変数/式)
                         while (i < tokens.Count && tokens[i].mValue != ";" && 0 > tokens[i].mValue.IndexOf("}")) i++;
@@ -95,6 +97,15 @@
                             List<Token> stateList = getStatement(tokens, ++i);
                             statement.AddRange(stateList);      //  {文...}/文 処理文
                             i += stateList.Count;
+                            while (i + 1 < tokens.Count &&
+                                tokens[i].mValue == "else" && tokens[i + 1].mValue == "if") {
+                                statement.Add(tokens[i++]);
+                                statement.Add(tokens[i++]);
+                                statement.Add(tokens[i]);           //  (...) 制御文
+                                stateList = getStatement(tokens, ++i);
+                                statement.AddRange(stateList);      //  {文...}/文 処理文
+                                i += stateList.Count;
+                            }
                             if (i < tokens.Count && tokens[i].mValue == "else") {
                                 statement.Add(tokens[i]);       //  else
                                 stateList = getStatement(tokens, ++i);

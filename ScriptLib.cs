@@ -39,6 +39,23 @@ namespace KScript
     ///     table                                           表編集(Win版)
     ///     imageView                                       イメージ表示(Win版)
     ///     
+    /// 
+    /// スクリプト関数の引数や戻り値を処理する関数
+    ///     bool isStringArray(Token args)                      配列に文字列名があるかの確認
+    ///     string[]? cnvArrayString(Token args)                配列をstring[]に変換
+    /// 　　double[]? cnvArrayDouble(Token args)                配列をdouble[]に変換
+    /// 　　double[,]? cnvArrayDouble2(Token args)              配列変数を実数配列double[,]に変換
+    /// 　　List<double> cnvListDouble(Token arg)               配列データを実数のリストに変換
+    /// 　　int getMaxArray(string arrayName)                   配列の最大インデックスを求める
+    /// 　　(string name, int index) getArrayNo(string arrayName)   配列から配列名と配列のインデックスを取得
+    /// 　　(string name, int? row, int? col) getArrayNo2(string arrayName) 2次元配列から配列名と行と列を取り出す
+    /// 　　(string name, int no) getArrayName(Token args)      変数名または配列名と配列の次元の取得
+    ///                                                     
+    /// 　　void setReturnArray(Token[] src, Token dest)        配列戻り値に設定
+    /// 　　void setReturnArray(double[,] src, Token dest)      2D配列の戻り値に設定
+    /// 　　void setReturnArray(double[] src, Token dest)        配列の戻り値に設定
+    /// 　　void setReturnArray(string[] src, Token dest)       文字列配列を戻り値に設定
+    /// 
     /// </summary>
     public class ScriptLib
     {
@@ -69,7 +86,7 @@ namespace KScript
         public Token innerFunc(Token funcName, Token arg, Token ret)
         {
             string argValue = mLexer.stripBracketString(arg.mValue);
-            Token args = getValueToken(argValue);
+            Token args = mScript.getValueToken(argValue);
             switch (funcName.mValue) {
                 case "input"          : return new Token(Console.ReadLine(), TokenType.STRING);
                 case "contains"       : return contains(args);
@@ -191,7 +208,7 @@ namespace KScript
                 return;
             List<Token> listToken = new();
             int maxcol = getMaxArray(arrayName);
-            for (int i =0; i < maxcol + 1; i++) {
+            for (int i = 0; i < maxcol + 1; i++) {
                 string key = $"{arrayName}[{i}]";
                 if (mVariables.ContainsKey(key)) {
                     if (mVariables[key] != null)
@@ -213,7 +230,7 @@ namespace KScript
         {
             (string arrayName, int no) = getArrayName(arg);
             if (no != 1)
-                return ;
+                return;
             if (isStringArray(arg)) {
                 //  文字列のソート
                 string[]? strArray = cnvArrayString(arg);
@@ -230,39 +247,15 @@ namespace KScript
         }
 
         /// <summary>
-        /// ソート
-        /// </summary>
-        /// <param name="arg">1D配列名</param>
-        /// <param name="ret">配列の戻り値名</param>
-        /// <returns></returns>
-        //public Token sort(Token arg, Token ret)
-        //{
-        //    if (isStringArray(arg)) {
-        //        //  文字列のソート
-        //        string[]? strArray = cnvArrayString(arg);
-        //        Array.Sort(strArray);
-        //        setReturnArray(strArray, ret);
-        //    } else {
-        //        //  実数のソート
-        //        double[]? doubleArray = cnvArrayDouble(arg);
-        //        Array.Sort(doubleArray);
-        //        setReturnArray(doubleArray, ret);
-        //    }
-        //    //  戻り値の設定
-        //    mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-        //    return mScript.mParse.mVariables["return"];
-        //}
-
-        /// <summary>
         /// 配列を逆順にする
         /// </summary>
         /// <param name="arg">配列名</param>
         public void reverse(Token arg)
         {
             (string arrayName, int no) = getArrayName(arg);
-            if (no != 1) return ;
+            if (no != 1) return;
             int maxcol = getMaxArray(arrayName);
-            if (maxcol <= 0) return ;
+            if (maxcol <= 0) return;
             Token[] tokens = new Token[maxcol + 1];
             arrayName += "[";
             foreach (var variable in mVariables) {
@@ -453,6 +446,24 @@ namespace KScript
                 if (0 <= variable.Key.IndexOf(arrayName)) {
                     if (variable.Value.mType != TokenType.STRING)
                         listData.Add(ylib.doubleParse(variable.Value.mValue));
+                }
+            }
+            return listData;
+        }
+
+        /// <summary>
+        /// 配列データを文字列のリストに変換
+        /// </summary>
+        /// <param name="arg">配列名</param>
+        /// <returns>文字列リスト</returns>
+        private List<string> cnvListString(Token arg)
+        {
+            List<string> listData = new List<string>();
+            string arrayName = getSearchName(arg);
+            foreach (var variable in mVariables) {
+                if (0 <= variable.Key.IndexOf(arrayName)) {
+                    if (variable.Value.mType == TokenType.STRING)
+                        listData.Add(variable.Value.mValue);
                 }
             }
             return listData;
@@ -855,7 +866,7 @@ namespace KScript
                 }
             } else {
                 //  通常の引数
-                buf = mScript.express(new Token(value, TokenType.VARIABLE)).mValue;
+                buf = mScript.express(mLexer.string2Token(value)).mValue.Trim();
             }
 
             if (mVariables.ContainsKey(buf))
