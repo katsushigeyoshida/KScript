@@ -1,5 +1,7 @@
 ﻿//  TEST06
 #include "scriptLib.sc";
+println(dateTimeNow(1));
+startTime();
 b[] = { 1, 2, 3, 4 };
 printArray(b[]);
 c = sqrt(合計(b[]));
@@ -13,3 +15,4 @@ print(b, "^2 = ", 合計(b[]), " ", c, " ", 平方根(b[]), "\n");
        sum += a[i];
     return sum;
 }
+println("経過時間: ",lapTime());

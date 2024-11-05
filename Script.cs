@@ -94,25 +94,28 @@ namespace KScript
             "print(出力); : 値の出力",
             "println(出力); : 値の出力(末尾に改行追加)",
             "#include \"ファイル\"; : ファイル読込による機能追加",
+            "exit; : プログラムの終了",
         };
 
         public enum RETURNTYPE { NORMAL, CONTINUE, BREAK, RETURN, ERROR }
 
-        public List<Token> mTokenList = new List<Token>();
-        public List<List<Token>> mStatements = new List<List<Token>>();
+        public List<Token> mTokenList = new List<Token>();              //  字句解析リスト
+        public List<List<Token>> mStatements = new List<List<Token>>(); //  構文リスト
 
-        public KParse mParse = new KParse();
-        public KLexer mLexer = new KLexer();
-        public ScriptLib mScriptLib;
-        public string mScriptFolder = "";
+        public KParse mParse = new KParse();                    //  構文解析
+        public KLexer mLexer = new KLexer();                    //  字句解析
+        public ScriptLib mScriptLib;                            //  内部関数ライブラリ
+        public string mScriptFolder = "";                       //  プログラムファイルフォルダ
+
         public bool mDebug = false;
         public bool mDebugConsole = false;
 
         public Action printCallback;                            //  print文のコールバック関数
         public ControlData mControlData = new ControlData();    //  データを参照渡しするため
 
-        private YCalc mCalc = new YCalc();
-        private YLib ylib = new YLib();
+        private string mFuncName = "";                          //  実行中の関数名
+        private YCalc mCalc = new YCalc();                      //  数式処理
+        private YLib ylib = new YLib();                         //  汎用関数
 
         /// <summary>
         /// コンストラクタ
@@ -142,6 +145,7 @@ namespace KScript
         public void clear()
         {
             mStatements.Clear();
+            mTokenList.Clear();
             mParse.mVariables.Clear();
             mParse.mFunctions.Clear();
         }
@@ -173,26 +177,33 @@ namespace KScript
         /// <param name="arg">引数</param>
         public void execute(string funcName, List<Token> arg = null)
         {
-            //  スクリプト関数処理部の抽出・登録
-            List<List<Token>> funcStatement = null;
-            if (mParse.mFunctions.ContainsKey(funcName)) {
-                //  関数指定
-                Token func = mParse.mFunctions[funcName];
-                List<Token> funcList = mParse.getStatement(mLexer.tokenList(func.mValue));
-                funcStatement = mParse.getStatements(mLexer.tokenList(mLexer.stripBracketString(funcList[2].mValue, funcList[2].mValue[0])));
-                //  引数の登録
-                if (arg != null) {
-                    string[] funcargs = mLexer.stripBracketString(funcList[1].mValue, '(').Split(',');
-                    for (int i = 0; i < funcargs.Length; i++)
-                        mParse.addVariable(new Token(funcargs[i].Trim(), TokenType.VARIABLE), arg[i]);
+            try {
+                //  スクリプト関数処理部の抽出・登録
+                mFuncName = funcName;
+                List<List<Token>> funcStatement = null;
+                if (mParse.mFunctions.ContainsKey(funcName)) {
+                    //  関数指定
+                    Token func = mParse.mFunctions[funcName];
+                    List<Token> funcList = mParse.getStatement(mLexer.tokenList(func.mValue));
+                    funcStatement = mParse.getStatements(mLexer.tokenList(mLexer.stripBracketString(funcList[2].mValue, funcList[2].mValue[0])));
+                    //  引数の登録
+                    if (arg != null) {
+                        string[] funcargs = mLexer.stripBracketString(funcList[1].mValue, '(').Split(',');
+                        for (int i = 0; i < funcargs.Length; i++)
+                            mParse.setVariable(new Token(funcargs[i].Trim(), TokenType.VARIABLE), arg[i]);
+                    }
                 }
-            }
-            //  構文実行
-            if (funcStatement == null)
-                funcStatement = mStatements;
-            foreach (List<Token> statement in funcStatement) {
-                if (exeStatement(statement) != RETURNTYPE.NORMAL)
-                    break;
+                //  構文実行
+                if (funcStatement == null)
+                    funcStatement = mStatements;
+                foreach (List<Token> statement in funcStatement) {
+                    if (exeStatement(statement) != RETURNTYPE.NORMAL)
+                        break;
+                }
+            } catch (Exception e) {
+                System.Diagnostics.Debug.WriteLine($"{funcName} [{e.ToString()}]");
+                if (funcName != "" && funcName != "main")
+                    throw new Exception(e.Message);
             }
         }
 
@@ -228,7 +239,8 @@ namespace KScript
         {
             printToken("", tokens, true, mDebug, mDebugConsole);
             if (tokens[0].mType == TokenType.VARIABLE ||
-                tokens[0].mType == TokenType.ARRAY) {
+                tokens[0].mType == TokenType.ARRAY ||
+                tokens[0].mType == TokenType.ASSIGNMENT) {
                 return letStatement(tokens);
             } else if (tokens[0].mType == TokenType.STATEMENT) {
                 if (tokens[0].mValue == "print") {
@@ -248,6 +260,8 @@ namespace KScript
                     return RETURNTYPE.BREAK;
                 } else if (tokens[0].mValue == "continue") {
                     return RETURNTYPE.CONTINUE;
+                } else if (tokens[0].mValue == "exit") {
+                    throw new Exception($"exit [{mFuncName}]");
                 } else if (tokens[0].mValue == "#include") {
                     return includeStatemant(tokens);
                 } else {
@@ -272,12 +286,14 @@ namespace KScript
         /// <returns></returns>
         public RETURNTYPE includeStatemant(List<Token> tokens)
         {
-            string scriptPath = tokens[1].mValue;
+            string scriptPath = tokens[1].getValue();
             scriptPath = Path.Combine(mScriptFolder, scriptPath);
             if (File.Exists(scriptPath)) {
                 List<string> scriptData = ylib.loadListData(scriptPath);
                 string code = string.Join("\n", scriptData);
                 addScript(code);
+
+
                 return RETURNTYPE.NORMAL;
             } else {
                 outputString($"Error: not exists file [{scriptPath}]\n");
@@ -309,17 +325,32 @@ namespace KScript
                 } else if (tokens[0].mType == TokenType.VARIABLE ||
                     tokens[0].mType == TokenType.ARRAY) {
                     //  変数、配列に代入
-                    variable = getArrayVariable(tokens[0]);
+                    variable = getVariableName(tokens[0]);
                     expressList.AddRange(tokens.Skip(2));
+                } else if (tokens[0].mType == TokenType.ASSIGNMENT) {
+                    //  '++','--'の時
+                    if (1 < tokens[0].mValue.Length && tokens[0].mValue[1] != '=') {
+                        Token token = new Token("1", TokenType.LITERAL);
+                        expressList = new List<Token>(){
+                            tokens[1],
+                            new Token(tokens[0].mValue[0].ToString(), TokenType.OPERATOR),
+                            token
+                        };
+                        variable = getVariableName(tokens[1]);
+                        Token v = express(expressList);
+                        if (v == null) return RETURNTYPE.ERROR;
+                        mParse.setVariable(variable, v);
+                        return RETURNTYPE.NORMAL;
+                    }
                 } else {
                     outputString($"Error: {tokensString(tokens)}\n");
                     return RETURNTYPE.ERROR;
                 }
                 if (tokens[1].mType == TokenType.ASSIGNMENT) {
                     //  複合演算子(++.--,+=,-=,*=,/=,^=)
-                    //  [変数 = 変数 [+,-,*,/,^] 値] の形式に変換
-                    Token token = new Token("1", TokenType.LITERAL);    //  '++','--'の時値
+                    //  [変数 = 変数 [+,-,*,/,^] 値] の形式に変換 
                     if (tokens[1].mValue.Length == 2) {
+                        Token token = new Token("1", TokenType.LITERAL);    //  '++','--'の時値
                         //  '++','--' 以外の複合演算子
                         if (tokens[1].mValue[1] == '=') {
                             token = express(tokens, 2);
@@ -339,7 +370,7 @@ namespace KScript
                 Token value = express(expressList);
                 if (value == null)
                     return RETURNTYPE.ERROR;
-                mParse.addVariable(variable, value);
+                mParse.setVariable(variable, value);
             }
             return RETURNTYPE.NORMAL;
         }
@@ -411,6 +442,10 @@ namespace KScript
                         return returnType;
                     letStatement(funcStatement[2]);                 //  更新処理
                 }
+            } else {
+                //  Error
+                outputString($"Error: forStatement [{tokens[1]}]\n");
+                return RETURNTYPE.ERROR;
             }
             //calcError("forStatement", tokens);
             return RETURNTYPE.NORMAL;
@@ -436,11 +471,13 @@ namespace KScript
                     string buf = "";
                     for (int i = 0; i < tokenList.Count; i++) {
                         if (tokenList[i].mType == TokenType.DELIMITER) {
-                            buf += express(expList).mValue;
+                            Token v = express(expList);
+                            buf += v.getValue();
                             expList = new List<Token>();
                         } else if (i == tokenList.Count - 1) {
                             expList.Add(tokenList[i]);
-                            buf += express(expList).mValue;
+                            Token v = express(expList);
+                            buf += v.getValue();
                         } else {
                             expList.Add(tokenList[i]);
                         }
@@ -450,6 +487,7 @@ namespace KScript
                 }
             } else if (tokens[1].mType == TokenType.STRING) {
                 string buf = tokens[1].mValue.Replace("\\n", "\n");
+                buf = ylib.stripBracketString(buf, '"');
                 outputString(buf);
             } else {
                 //  Error
@@ -470,7 +508,7 @@ namespace KScript
                 token = tokens[1].copy();
             else
                 token = express(tokens, 1);
-            mParse.addVariable(new Token("return", TokenType.VARIABLE), token);
+            mParse.setVariable(new Token("return", TokenType.VARIABLE), token);
 
             return RETURNTYPE.NORMAL;
         }
@@ -489,7 +527,7 @@ namespace KScript
             Token result = function(funcName, arg, ret);
             if (result == null || result.mType == TokenType.ERROR)
                 return RETURNTYPE.ERROR;
-            mParse.addVariable(new Token("return", TokenType.VARIABLE), result);
+            mParse.setVariable(new Token("return", TokenType.VARIABLE), result);
             return RETURNTYPE.NORMAL;
         }
 
@@ -517,6 +555,8 @@ namespace KScript
                 }
                 return result;
             } catch (Exception e) {
+                if (0 <= e.Message.IndexOf("exit"))
+                    throw new Exception(e.Message);
                 outputString($"Error: not found function [{funcName.mValue}]\n");
                 return new Token(funcName.mValue, TokenType.ERROR);
             }
@@ -594,6 +634,8 @@ namespace KScript
                 }
                 return false;
             } catch (Exception e) {
+                if (0 <= e.Message.IndexOf("exit"))
+                    throw new Exception(e.Message);
                 outputString($"ERROR: conditional Statement [{e.Message}]\n");
                 return false;
             }
@@ -623,17 +665,15 @@ namespace KScript
                 if (tokens[i].mType == TokenType.DELIMITER) {
                     break;
                 } else if (tokens[i].mType == TokenType.LITERAL) {
-                    token = getVariable(tokens[i]);
+                    token = tokens[i];
                 } else if (tokens[i].mType == TokenType.VARIABLE) {
-                    token = getVariable(tokens[i]);
+                    token = getVariableValue(tokens[i]);
                 } else if (tokens[i].mType == TokenType.ARRAY) {
-                    token = getArrayVariable(tokens[i]);
-                    if (token != null)
-                        token = getVariable(token);
+                    token = getVariableValue(tokens[i]);
                 } else if (tokens[i].mType == TokenType.STRING) {
-                    token = tokens[i].copy();
+                    token = tokens[i];
                 } else if (tokens[i].mType == TokenType.CONSTANT) {
-                    token = tokens[i].copy();
+                    token = tokens[i];
                     token.mValue = mCalc.expression(token.mValue).ToString();
                     token.mType = TokenType.LITERAL;
                 } else if (tokens[i].mType == TokenType.EXPRESS) {
@@ -643,11 +683,11 @@ namespace KScript
                     token = function(tokens[i], tokens[i + 1]);
                     i++;
                 } else if (tokens[i].mType == TokenType.OPERATOR) {
-                    token = tokens[i].copy();
+                    token = tokens[i];
                 } else if (tokens[i].mType == TokenType.ASSIGNMENT) {
                     token = tokens[i].copy();
                     if (tokens[i].mValue[1] == '=') {
-                        token.mValue = tokens[i].mValue[0].ToString() + getVariable(tokens[i - 1]).mValue;
+                        token.mValue = tokens[i].mValue[0].ToString() + getVariableValue(tokens[i - 1]).mValue;
                     } else {
                         token.mValue = tokens[i].mValue[0].ToString() + "1";
                     }
@@ -666,7 +706,7 @@ namespace KScript
                         tmpKey = tokens[i - 1];
                     else
                         tmpKey = tokens[i + 1];
-                    tmpValue = getVariable(tmpKey);
+                    tmpValue = getVariableValue(tmpKey);
                     tmpValue.mValue += token.mValue;
                     tmpValue.mValue = mCalc.expression(tmpValue.mValue).ToString();
                     tmpValue.mType = TokenType.LITERAL;
@@ -675,7 +715,7 @@ namespace KScript
                         i++;
                     } else if (tokens[i].mValue[1] == '=')
                         i++;
-                    mParse.addVariable(tmpKey, tmpValue);
+                    mParse.setVariable(tmpKey, tmpValue);
                 } else if (buf.mType == TokenType.STRING || token.mType == TokenType.STRING) {
                     if (0 < i && tokens[i - 1].mType == TokenType.OPERATOR)
                         buf.mValue = buf.mValue.Remove(buf.mValue.Length - 1);
@@ -686,13 +726,15 @@ namespace KScript
                     buf.mType = TokenType.EXPRESS;
                 } else {
                     buf.mValue += token.mValue;
-                    buf.mValue = mCalc.expression(buf.mValue).ToString();
-                    buf.mType = TokenType.LITERAL;
                 }
             }
-            if (buf != null)
-                return buf.copy();
-            else
+            if (buf != null && buf.mType != TokenType.STRING) {
+                buf.mValue = mCalc.expression(buf.mValue).ToString();
+                buf.mType = TokenType.LITERAL;
+                return buf;
+            } else if (buf != null && buf.mType == TokenType.STRING) {
+                return buf;
+            } else
                 return new Token("Error: express", TokenType.ERROR);
         }
 
@@ -737,7 +779,10 @@ namespace KScript
                 List<string> args = mLexer.commaSplit(mLexer.stripBracketString(arg.mValue, '('));
                 for (int i = 0; i < args.Count; i++) {
                     if (0 <= args[i].IndexOf("["))
-                        argValue.Add(new Token(args[i].Trim(), TokenType.VARIABLE));
+                        if (0 <= args[i].IndexOf("[@]") || 0 <= args[i].IndexOf("[%]"))
+                            argValue.Add(new Token(args[i].Trim(), TokenType.STRING));
+                        else if (0 <= args[i].IndexOf("["))
+                            argValue.Add(new Token(args[i].Trim(), TokenType.VARIABLE));
                     else
                         argValue.Add(express(new Token(args[i].Trim(), TokenType.EXPRESS)));
                 }
@@ -752,13 +797,13 @@ namespace KScript
         /// <param name="func">引数文字列</param>
         /// <param name="sp">開始位置</param>
         /// <returns>引数リスト</returns>
-        private List<Token> getFuncArgs(string func, int sp = 0)
+        public List<Token> getFuncArgs(string func, int sp = 0)
         {
             List<Token> args = new List<Token>();
             List<Token> funcList = mParse.getStatement(mLexer.tokenList(func));
             List<string> funcargs = mLexer.commaSplit(mLexer.stripBracketString(funcList[sp].mValue, '('));
             for (int i = 0; i < funcargs.Count; i++)
-                args.Add(getValueToken(funcargs[i].Trim()));
+                args.Add(getVariableValue(new Token(funcargs[i].Trim())));
             return args;
         }
 
@@ -768,13 +813,13 @@ namespace KScript
         /// <param name="func">関数スクリプト</param>
         /// <param name="sp">引数の位置</param>
         /// <returns>引数名リスト</returns>
-        private List<Token> getFuncArgNames(string func, int sp = 0)
+        public List<Token> getFuncArgNames(string func, int sp = 0)
         {
             List<Token> args = new List<Token>();
             List<Token> funcList = mParse.getStatement(mLexer.tokenList(func));
             List<string> funcargs = mLexer.commaSplit(mLexer.stripBracketString(funcList[sp].mValue, '('));
             for (int i = 0; i < funcargs.Count; i++)
-                args.Add(mLexer.string2Token(funcargs[i].Trim()));
+                args.Add(new Token(funcargs[i].Trim()));
             return args;
         }
 
@@ -791,31 +836,48 @@ namespace KScript
                     //  配列のコピー
                     setFuncArray(src[i], dest[i], script);
                 } else {
-                    List<Token> variables = mLexer.tokenList(src[i].mValue);
-                    string buf = "";
-                    for (int j = 0; j < variables.Count; j++) {
-                        if (variables[j].mType == TokenType.VARIABLE ||
-                            variables[j].mType == TokenType.ARRAY)
-                            buf += getValueToken(variables[j].mValue).mValue;
-                        else
-                            buf += variables[j].mValue;
-                    }
-                    script.mParse.addVariable(dest[i], express(new Token(buf, TokenType.LITERAL)));
+                    string buf = getVariableValue(src[i]).mValue;
+                    script.mParse.setVariable(dest[i], express(new Token(buf, TokenType.LITERAL)));
                 }
             }
         }
 
         /// <summary>
-        /// 変数名を数値に変換
+        /// 変数の値の取得
         /// </summary>
-        /// <param name="token">変数名(トークン)</param>
-        /// <returns>数値(トークン)</returns>
-        private Token getVariable(Token token)
+        /// <param name="token">変数名</param>
+        /// <returns>値</returns>
+        public Token getVariableValue(Token token)
         {
-            if (mParse.mVariables.ContainsKey(token.mValue)) {
-                return mParse.mVariables[token.mValue];
+            var v = getVariableName(token);
+            if (v.mType == TokenType.EXPRESS)
+                v = express(v);
+            return mParse.getVariable(v);
+        }
+
+        /// <summary>
+        /// 変数名の変換(配列のインデックスを変換)
+        /// </summary>
+        /// <param name="token">変数名</param>
+        /// <returns>変数名</returns>
+        public Token getVariableName(Token token)
+        {
+            if (token.mType == TokenType.ARRAY) {
+                string arrayname = token.mValue.Substring(0, token.mValue.IndexOf('['));
+                string index = ylib.stripBracketString(ylib.getBracketString(token.mValue, 0, '['), '[');
+                List<string> varables = mLexer.commaSplit(index);
+                List<Token> tokens = new List<Token>();
+                for (int i = 0; i < varables.Count; i++)
+                    tokens.Add(getVariableValue(new Token(varables[i].Trim())));
+                string variable = "[";
+                for (int i = 0; i < tokens.Count; i++)
+                    variable += tokens[i].mValue + ",";
+                if (variable[variable.Length - 1] == ',')
+                    variable = variable.Remove(variable.Length - 1);
+                variable = arrayname + variable + "]";
+                return new Token(variable);
             } else {
-                return token.copy();
+                return token;
             }
         }
 
@@ -844,48 +906,9 @@ namespace KScript
                 }
             } else {
                 //  通常の引数
-                buf = express(mLexer.string2Token(value)).mValue.Trim();
+                buf = express(new Token(value)).mValue.Trim();
             }
-
-            if (mParse.mVariables.ContainsKey(buf))
-                return mParse.mVariables[buf];
-            else
-                return new Token(buf, TokenType.LITERAL);
-        }
-
-        /// <summary>
-        /// ^配列変数名の変換([m,n] → [2,3])
-        /// </summary>
-        /// <param name="token">変数名</param>
-        /// <returns>変数名</returns>
-        private Token getArrayVariable(Token token)
-        {
-            char[] sep = new char[] { '[', ']' };
-            if (0 > token.mValue.IndexOf("[")) {
-                //  配列以外
-                return token.copy();
-            } else if (0 <= token.mValue.IndexOf("[]")) {
-                //  1次元配列宣言
-                return token.copy();
-            } else if (0 <= token.mValue.IndexOf("[,]")) {
-                //  2次元配列宣言
-                return token.copy();
-            } else {
-                //  配列の個別インデックス変換([m,n] → [2,3])
-                string[] str = token.mValue.Split(sep);
-                if (2 <= str.Length) {
-                    List<Token> tokens = mLexer.tokenList(str[1]);
-                    List<List<Token>> elements = mLexer.tokensList(tokens, ',');
-                    string buf = "";
-                    for (int i = 0; i < elements.Count; i++) {
-                        buf += express(elements[i]).mValue + ",";
-                    }
-                    buf = buf.TrimEnd(',');
-                    buf = str[0] + '[' + buf + ']';
-                    return new Token(buf, TokenType.VARIABLE);
-                }
-            }
-            return token.copy();
+            return getVariableValue(new Token(buf));
         }
 
         /// <summary>
@@ -920,7 +943,7 @@ namespace KScript
             List<List<Token>> dataList = mLexer.tokensList(datas);
             for (int i = 0; i < dataList.Count; i++) {
                 string buf = $"{arrayName}[{i}]";
-                mParse.addVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
+                mParse.setVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
             }
             return true;
         }
@@ -944,7 +967,7 @@ namespace KScript
                     List<List<Token>> dataList = mLexer.tokensList(datas);
                     for (int j = 0; j < dataList.Count; j++) {
                         string buf = $"{arrayName}[{i},{j}]";
-                        mParse.addVariable(new Token(buf, TokenType.VARIABLE), express(dataList[j]));
+                        mParse.setVariable(new Token(buf, TokenType.VARIABLE), express(dataList[j]));
                     }
                 }
             } else {
@@ -957,7 +980,7 @@ namespace KScript
                 List<List<Token>> dataList = mLexer.tokensList(datas);
                 for (int i = 0; i < dataList.Count; i++) {
                     string buf = $"{arrayName}[{indexToken.mValue},{i}]";
-                    mParse.addVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
+                    mParse.setVariable(new Token(buf, TokenType.VARIABLE), express(dataList[i]));
                 }
             }
             return true;
@@ -981,7 +1004,7 @@ namespace KScript
             foreach (var variable in parse.mParse.mVariables) {
                 if (variable.Key.IndexOf(srcName) >= 0) {
                     string key = variable.Key.Replace(srcName, destName);
-                    mParse.addVariable(new Token(key, TokenType.VARIABLE), variable.Value);
+                    mParse.setVariable(new Token(key, TokenType.VARIABLE), variable.Value);
                 }
             }
         }
@@ -1002,7 +1025,7 @@ namespace KScript
             foreach (var variable in mParse.mVariables) {
                 if (variable.Key.IndexOf(srcName) >= 0) {
                     string key = variable.Key.Replace(srcName, destName);
-                    script.mParse.addVariable(new Token(key, TokenType.VARIABLE), variable.Value);
+                    script.mParse.setVariable(new Token(key, TokenType.VARIABLE), variable.Value);
                 }
             }
         }

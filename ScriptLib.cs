@@ -28,7 +28,7 @@ namespace KScript
     ///     matrixMulti     : c[,] = matrixMulti(a[,], b[,]);   行列の積 AxB
     ///     matrixAdd       : c[,] = matrixAdd(a[,], b[,]);     行列の和 A+B
     ///     matrixInverse   : b[,] = matrixInverse(a[,]);       逆行列 A^-1
-    ///     copyMatrix      : b[,] = copyMatrix(a[,]);          行列のコピー
+    ///     matrixCopy      : b[,] = matrixCopy(a[,]);          行列のコピー
     ///     
     /// 追加したい関数
     ///     key  : a = key();                               1文字入力
@@ -59,9 +59,48 @@ namespace KScript
     /// </summary>
     public class ScriptLib
     {
-        public Dictionary<string, Token> mVariables;    //  変数リスト(変数名,値)
+        public static string[] mFuncNames = new string[] {
+            "inputBox(); 文字入力ダイヤログ",
+            "messageBox(outString[, title]); 文字列のダイヤログ表示",
+            "menuSelect(menu[],title); メニューリストを表示して項目Noを返す",
+            "contains(c[2]); 配列の有無(0:なし 1:あり)",
+            "count(a[]); 1次元配列のサイズ",
+            "count(a[,]); 2次元配列のサイズ",
+            "count(a[1,]); 2次元配列1列目のサイズ",
+            "clear(a[]); 配列クリア",
+            "remove(a[],start[,end]); 配列要素の削除",
+            "squeeze(a[]); 配列の未使用データを削除",
+            "sort(a[]); 配列のソート",
+            "reverse(a[]); 配列の逆順",
+            "max(a[]); 配列の最大値",
+            "min(a[,]); 配列の最小値",
+            "sum(a[]);  配列の合計",
+            "average(a[,]); 配列の平均",
+            "variance(a[]); 配列の分散",
+            "stdDeviation(a[]); 配列の標準偏差",
+            "covariance(a[], b[]); 共分散",
+            "corrCoeff(x[],y[]); 配列の相関係数",
+            "cmd(command); Windowsコマンドの実行",
+            "unitMatrix(size); 単位行列(2次元)の作成(a[,]=...)",
+            "matrixTranspose(a[,]); 転置行列(2次元行列Aの転置(A^T) b[,]=...)",
+            "matrixMulti(a[,], b[,]); 行列の積 AxB (c[,]=...)",
+            "matrixAdd(a[,], b[,]); 行列の和 A+B c[,]=...)",
+            "matrixInverse(a[,]); 逆行列 A^-1 (b[,]=...)",
+            "matrixCopy(a[,]); 行列のコピー(b[,]=...)",
+            "dateTimeNow(type); 現在の時刻を文字列で取得(0:\"HH:mm:ss 1:yyyy/MM/dd HH:mm:ss 2:yyyy/MM/dd 3:HH時mm分ss秒 4:yyyy年MM月dd日 HH時mm分ss秒 5:yyyy年MM月dd日",
+            "startTime(); 時間計測の開始",
+            "lapTime(); 経過時間の取得(秒)",
+            "solveQuadraticEquation(a,b,c); 2次方程式の解(y = a*x^2+b*x+c)(y[] = solv..) ",
+            "solveCubicEquation(a,b,c,d); 3次方程式の解(y = a*x^3+b*x^2+c*x+d)(y[] = solv..) ",
+            "solveQuarticEquation(a,b,c,d,e); 4次方程式の解(y = a*x^4+b*x^3+c*x^2+d*x+e)(y[] = solv..) ",
+        };
 
-        private Script mScript;
+        //  共有クラス
+        public Dictionary<string, Token> mVariables;    //  変数リスト(変数名,値)
+        public Script mScript;
+
+        private DateTime mStartTime;
+
         private KLexer mLexer = new KLexer();
         private YCalc mCalc = new YCalc();
         private YLib ylib = new YLib();
@@ -85,8 +124,7 @@ namespace KScript
         /// <returns>戻り値</returns>
         public Token innerFunc(Token funcName, Token arg, Token ret)
         {
-            string argValue = mLexer.stripBracketString(arg.mValue);
-            Token args = mScript.getValueToken(argValue);
+            List<Token> args = mScript.getFuncArgs(arg.mValue);
             switch (funcName.mValue) {
                 case "input"          : return new Token(Console.ReadLine(), TokenType.STRING);
                 case "contains"       : return contains(args);
@@ -110,10 +148,67 @@ namespace KScript
                 case "matrixMulti"    : return matrixMulti(args, ret);
                 case "matrixAdd"      : return matrixAdd(args, ret);
                 case "matrixInverse"  : return matrixInverse(args, ret);
-                case "copyMatrix"     : return copyMatrix(args, ret);
+                case "matrixCopy": return matrixCopy(args, ret);
+                case "dateTimeNow": return dateTimeNow(args);
+                case "startTime": starTime(); break;
+                case "lapTime": return lapTime();
+                case "solveQuadraticEquation": return solveQuadraticEquation(args, ret);
+                case "solveCubicEquation": return solveCubicEquation(args, ret);
+                case "solveQuarticEquation": return solveQuarticEquation(args, ret);
                 default: return new Token("not found func", TokenType.ERROR);
             }
             return new Token("", TokenType.EMPTY);
+        }
+
+        /// <summary>
+        /// 時間計測の開始
+        /// </summary>
+        public void starTime()
+        {
+            mStartTime = DateTime.Now;
+        }
+
+        /// <summary>
+        /// 経過時間の取得(秒)
+        /// </summary>
+        /// <returns>経過時間(s)</returns>
+        public Token lapTime()
+        {
+            var endTime = DateTime.Now;
+            return new Token((endTime - mStartTime).TotalSeconds.ToString(), TokenType.LITERAL);
+        }
+
+        /// <summary>
+        /// 現在の時刻の取得
+        /// 0:"HH:mm:ss 1:yyyy/MM/dd HH:mm:ss 2:yyyy/MM/dd
+        /// 3:HH時mm分ss秒 4:yyyy年MM月dd日 HH時mm分ss秒 5:yyyy年MM月dd日
+        /// </summary>
+        /// <param name="args">書式の種類</param>
+        /// <returns></returns>
+        public Token dateTimeNow(List<Token> args)
+        {
+            if (args == null || args.Count == 0)
+                return new Token("", TokenType.ERROR);
+            int format = ylib.intParse(mScript.getValueToken(args[0].mValue).mValue);
+            if (format == 1) {
+                string datetime = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
+                return new Token(datetime, TokenType.STRING);
+            } else if (format == 2) {
+                string datetime = DateTime.Now.ToString("yyyy/MM/dd");
+                return new Token(datetime, TokenType.STRING);
+            } else if (format == 3) {
+                string datetime = DateTime.Now.ToString("HH時mm分ss秒");
+                return new Token(datetime, TokenType.STRING);
+            } else if (format == 4) {
+                string datetime = DateTime.Now.ToString("yyyy年MM月dd日 HH時mm分ss秒");
+                return new Token(datetime, TokenType.STRING);
+            } else if (format == 5) {
+                string datetime = DateTime.Now.ToString("yyyy年MM月dd日");
+                return new Token(datetime, TokenType.STRING);
+            } else {
+                string datetime = DateTime.Now.ToString("HH:mm:ss");
+                return new Token(datetime, TokenType.STRING);
+            }
         }
 
         /// <summary>
@@ -121,9 +216,9 @@ namespace KScript
         /// </summary>
         /// <param name="args">引数</param>
         /// <returns>0:存在しない/1:存在する</returns>
-        public Token contains(Token args)
+        public Token contains(List<Token> args)
         {
-            if (mVariables.ContainsKey(args.mValue))
+            if (mVariables.ContainsKey(args[0].mValue))
                 return new Token("1", TokenType.LITERAL);
             return new Token("0", TokenType.LITERAL);
         }
@@ -133,17 +228,17 @@ namespace KScript
         /// </summary>
         /// <param name="args">配列名</param>
         /// <returns>サイズ</returns>
-        public Token getCount(Token args)
+        public Token getCount(List<Token> args)
         {
-            int cp = args.mValue.LastIndexOf(',');
-            int sp = args.mValue.IndexOf("[");
-            if (0 < args.mValue.IndexOf("[,]"))
+            int cp = args[0].mValue.LastIndexOf(',');
+            int sp = args[0].mValue.IndexOf("[");
+            if (0 < args[0].mValue.IndexOf("[,]"))
                 cp = -1;
             string arrayName = "";
             if (0 < cp)
-                arrayName = args.mValue.Substring(0, cp + 1);   //  行単位の配列名(abc[a,
+                arrayName = args[0].mValue.Substring(0, cp + 1);   //  行単位の配列名(abc[a,
             else if (0 < sp)
-                arrayName = args.mValue.Substring(0, sp);       //  配列名(abc[)
+                arrayName = args[0].mValue.Substring(0, sp);       //  配列名(abc[)
             int count = 0;
             foreach (var variable in mVariables) {
                 if (0 < cp) {
@@ -165,9 +260,9 @@ namespace KScript
         /// 配列をクリア(内部関数)
         /// </summary>
         /// <param name="args">配列名</param>
-        public void clear(Token args)
+        public void clear(List<Token> args)
         {
-            string arrayName = args.mValue.Substring(0, args.mValue.IndexOf("["));
+            string arrayName = args[0].mValue.Substring(0, args[0].mValue.IndexOf("["));
             int count = 0;
             foreach (var variable in mVariables) {
                 int sp = variable.Key.IndexOf("[");
@@ -181,29 +276,28 @@ namespace KScript
         /// <summary>
         /// 配列から要素を削除する(remove(a[],st[,ed]);)
         /// </summary>
-        /// <param name="arg">配列名と要素番号</param>
-        public void remove(Token arg)
+        /// <param name="args">配列名と要素番号</param>
+        public void remove(List<Token> args)
         {
-            List<string> args = mLexer.commaSplit(arg.mValue);
             if (args.Count < 2) return;
-            (string arrayName, int no) = getArrayName(new Token(args[0], TokenType.VARIABLE));
-            int st = ylib.intParse(args[1]);
-            int ed = args.Count > 2 ? ylib.intParse(args[2]) : st;
+            (string arrayName, int no) = getArrayName(new Token(args[0].mValue, TokenType.VARIABLE));
+            int st = ylib.intParse(args[1].mValue);
+            int ed = args.Count > 2 ? ylib.intParse(args[2].mValue) : st; 
             for (int i = st; i <= ed; i++) {
                 string key = $"{arrayName}[{i}]";
                 if (mVariables.ContainsKey(key))
                     mVariables.Remove(key);
             }
-            squeeze(new Token(args[0], TokenType.VARIABLE));
+            squeeze(args);
         }
 
         /// <summary>
-        /// 配列の圧縮(未使用インデックス削除))
+        /// 配列の圧縮(未使用インデックス削除)(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
-        public void squeeze(Token arg)
+        /// <param name="args">配列名</param>
+        public void squeeze(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             if (no != 1)
                 return;
             List<Token> listToken = new();
@@ -223,36 +317,36 @@ namespace KScript
         }
 
         /// <summary>
-        /// ソート
+        /// ソート(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
-        public void sort(Token arg)
+        /// <param name="args">配列名</param>
+        public void sort(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             if (no != 1)
                 return;
-            if (isStringArray(arg)) {
+            if (isStringArray(args[0])) {
                 //  文字列のソート
-                string[]? strArray = cnvArrayString(arg);
+                string[]? strArray = cnvArrayString(args[0]);
                 Array.Sort(strArray);
-                clear(arg);
-                setReturnArray(strArray, arg);
+                clear(args);
+                setReturnArray(strArray, args[0]);
             } else {
                 //  実数のソート
-                double[]? doubleArray = cnvArrayDouble(arg);
+                double[]? doubleArray = cnvArrayDouble(args[0]);
                 Array.Sort(doubleArray);
-                clear(arg);
-                setReturnArray(doubleArray, arg);
+                clear(args);
+                setReturnArray(doubleArray, args[0]);
             }
         }
 
         /// <summary>
-        /// 配列を逆順にする
+        /// 配列を逆順にする(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
-        public void reverse(Token arg)
+        /// <param name="args">配列名</param>
+        public void reverse(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             if (no != 1) return;
             int maxcol = getMaxArray(arrayName);
             if (maxcol <= 0) return;
@@ -264,21 +358,21 @@ namespace KScript
                     tokens[maxcol - col] = variable.Value;
                 }
             }
-            clear(arg);
-            setReturnArray(tokens, arg);
+            clear(args);
+            setReturnArray(tokens, args[0]);
         }
 
         /// <summary>
-        /// 最大値を求める(a[], a[,], a[x,])
+        /// 最大値を求める(a[], a[,], a[x,])(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
+        /// <param name="args">配列名</param>
         /// <returns>最大値</returns>
-        public Token max(Token arg)
+        public Token max(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             double max = double.MinValue;
             if (no == 1 || no == 2) {
-                arrayName = getSearchName(arg);
+                arrayName = getSearchName(args[0]);
             } else
                 return new Token(arrayName, TokenType.ERROR);
             foreach (var variable in mVariables) {
@@ -294,16 +388,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 最小値を求める(a[], a[,], a[x,])
+        /// 最小値を求める(a[], a[,], a[x,])(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
+        /// <param name="args">配列名</param>
         /// <returns>最小値</returns>
-        public Token min(Token arg)
+        public Token min(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             double min = double.MaxValue;
             if (no == 1 || no == 2) {
-                arrayName = getSearchName(arg);
+                arrayName = getSearchName(args[0]);
             } else
                 return new Token(arrayName, TokenType.ERROR);
             foreach (var variable in mVariables) {
@@ -319,16 +413,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 配列の合計
+        /// 配列の合計(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
+        /// <param name="args">配列名</param>
         /// <returns>合計</returns>
-        public Token sum(Token arg)
+        public Token sum(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             List<double> listData = new();
             if (no == 1 || no == 2) {
-                listData = cnvListDouble(arg);
+                listData = cnvListDouble(args[0]);
             } else
                 return new Token(arrayName, TokenType.ERROR);
             double sum = listData.Sum();
@@ -336,16 +430,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 平均値を求める
+        /// 平均値を求める(inner function)
         /// </summary>
-        /// <param name="arg">配列名</param>
+        /// <param name="args">配列名</param>
         /// <returns>平均値</returns>
-        public Token average(Token arg)
+        public Token average(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             List<double> listData = new();
             if (no == 1 || no == 2) {
-                listData = cnvListDouble(arg);
+                listData = cnvListDouble(args[0]);
             } else
                 return new Token(arrayName, TokenType.ERROR);
             double ave = listData.Sum() / listData.Count;
@@ -353,16 +447,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 分散
+        /// 分散(inner function)
         /// </summary>
-        /// <param name="arg">配列</param>
+        /// <param name="args">配列</param>
         /// <returns>分散値</returns>
-        public Token variance(Token arg)
+        public Token variance(List<Token> args)
         {
-            (string arrayName, int no) = getArrayName(arg);
+            (string arrayName, int no) = getArrayName(args[0]);
             List<double> listData = new();
             if (no == 1 || no == 2) {
-                listData = cnvListDouble(arg);
+                listData = cnvListDouble(args[0]);
             } else
                 return new Token(arrayName, TokenType.ERROR);
             double ave = listData.Sum() / listData.Count;
@@ -371,13 +465,13 @@ namespace KScript
         }
 
         /// <summary>
-        /// 標準偏差
+        /// 標準偏差(inner function)
         /// </summary>
-        /// <param name="arg">配列</param>
+        /// <param name="args">配列</param>
         /// <returns>標準偏差</returns>
-        public Token standardDeviation(Token arg)
+        public Token standardDeviation(List<Token> args)
         {
-            Token token = variance(arg);
+            Token token = variance(args);
             if (token.mType != TokenType.ERROR)
                 return new Token(Math.Sqrt(ylib.doubleParse(token.mValue)).ToString(), TokenType.LITERAL);
             else
@@ -385,17 +479,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 共分散(a[],b[])
+        /// 共分散(a[],b[])(inner function)
         /// </summary>
         /// <param name="args">配列</param>
         /// <returns>共分散</returns>
-        public Token covariance(Token args)
+        public Token covariance(List<Token> args)
         {
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            if (listArg.Count < 2)
+            if (args.Count < 2)
                 return new Token("", TokenType.ERROR);
-            List<double> listData0 = cnvListDouble(new Token(listArg[0], TokenType.ARRAY));
-            List<double> listData1 = cnvListDouble(new Token(listArg[1], TokenType.ARRAY));
+            List<double> listData0 = cnvListDouble(args[0]);
+            List<double> listData1 = cnvListDouble(args[1]);
             if (listData0.Count != listData1.Count)
                 return new Token("", TokenType.ERROR);
             double ave0 = listData0.Average();
@@ -408,17 +501,16 @@ namespace KScript
         }
 
         /// <summary>
-        /// 相関係数(x[],y[])
+        /// 相関係数(x[],y[])(inner function)
         /// </summary>
         /// <param name="args">配列</param>
         /// <returns>相関係数</returns>
-        public Token correlationCoefficient(Token args)
+        public Token correlationCoefficient(List<Token> args)
         {
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            if (listArg.Count < 2)
+            if (args.Count < 2)
                 return new Token("", TokenType.ERROR);
-            List<double> x = cnvListDouble(new Token(listArg[0], TokenType.ARRAY));
-            List<double> y = cnvListDouble(new Token(listArg[1], TokenType.ARRAY));
+            List<double> x = cnvListDouble(args[0]);
+            List<double> y = cnvListDouble(args[1]);
             if (x.Count != y.Count)
                 return new Token("", TokenType.ERROR);
             double avex = x.Average();
@@ -434,6 +526,197 @@ namespace KScript
         }
 
         /// <summary>
+        /// Windowsコマンド実行
+        /// </summary>
+        /// <param name="args"></param>
+        private void cmd(List<Token> args)
+        {
+            ylib.openUrl(args[0].mValue);
+        }
+
+        /// <summary>
+        /// 2次方程式の解を求める
+        /// result[] = a * x^2 + b * x + c
+        /// </summary>
+        /// <param name="args">a,b,c</param>
+        /// <param name="ret"></param>
+        /// <returns></returns>
+        private Token solveQuadraticEquation(List<Token> args, Token ret)
+        {
+            if (args.Count < 3) return new Token("", TokenType.ERROR);
+            double a = ylib.doubleParse(args[0].mValue);
+            double b = ylib.doubleParse(args[1].mValue);
+            double c = ylib.doubleParse(args[2].mValue);
+            double[] result = ylib.solveQuadraticEquation(a, b, c).ToArray();
+            //  戻り値の設定
+            setReturnArray(result, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 3次方程式の解を求める
+        /// result[] = a * x^3 + b * x^2 + c * x + d
+        /// </summary>
+        /// <param name="args">a,b,c,d</param>
+        /// <param name="ret"></param>
+        /// <returns></returns>
+        private Token solveCubicEquation(List<Token> args, Token ret)
+        {
+            if (args.Count < 4) return new Token("", TokenType.ERROR);
+            double a = ylib.doubleParse(args[0].mValue);
+            double b = ylib.doubleParse(args[1].mValue);
+            double c = ylib.doubleParse(args[2].mValue);
+            double d = ylib.doubleParse(args[3].mValue);
+            double[] result = ylib.solveCubicEquation(a, b, c, d).ToArray();
+            //  戻り値の設定
+            setReturnArray(result, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 4次方程式の解を求める
+        /// result[] = a * x^4 + b * x^3 + c * x^2 + d * x + e
+        /// </summary>
+        /// <param name="args">a,b,c,d,e</param>
+        /// <param name="ret"></param>
+        /// <returns></returns>
+        private Token solveQuarticEquation(List<Token> args, Token ret)
+        {
+            if (args.Count < 5) return new Token("", TokenType.ERROR);
+            double a = ylib.doubleParse(args[0].mValue);
+            double b = ylib.doubleParse(args[1].mValue);
+            double c = ylib.doubleParse(args[2].mValue);
+            double d = ylib.doubleParse(args[3].mValue);
+            double e = ylib.doubleParse(args[4].mValue);
+            double[] result = ylib.solveQuarticEquation(a, b, c, d, e).ToArray();
+            //  戻り値の設定
+            setReturnArray(result, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 単位行列の作成(n x n)
+        /// </summary>
+        /// <param name="size">行列の大きさ</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token unitMatrix(List<Token> args, Token ret)
+        {
+            double[,] matrix = ylib.unitMatrix(ylib.intParse(args[0].mValue));
+
+            //  戻り値の設定
+            setReturnArray(matrix, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 転置行列  行列Aの転置A^T
+        /// </summary>
+        /// <param name="args">引数(行列 A</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token matrixTranspose(List<Token> args, Token ret)
+        {
+            //  2D配列を実数配列に変換
+            double[,]? a = cnvArrayDouble2(args[0]);
+            if (a == null) return new Token("", TokenType.ERROR);
+            //  行列演算
+            double[,] c = ylib.matrixTranspose(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 行列の積  AxB
+        /// 行列の積では 結合の法則  (AxB)xC = Ax(BxC) , 分配の法則 (A+B)xC = AxC+BxC , Cx(A+B) = CxA + CxB　が可
+        /// 交換の法則は成立しない  AxB ≠ BxA
+        /// </summary>
+        /// <param name="args">引数(行列A,行列B)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token matrixMulti(List<Token> args, Token ret)
+        {
+            //  2D配列を実数配列に変換
+            double[,]? a = cnvArrayDouble2(args[0]);
+            if (a == null) return new Token("", TokenType.ERROR);
+            double[,]? b = cnvArrayDouble2(args[1]);
+            if (b == null) return new Token("", TokenType.ERROR);
+            //  行列演算
+            double[,] c = ylib.matrixMulti(a, b);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 行列の和 A+B
+        /// 異なるサイズの行列はゼロ行列にする
+        /// </summary>
+        /// <param name="args">引数(行列A,行列B)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token matrixAdd(List<Token> args, Token ret)
+        {
+            //  2D配列を実数配列に変換
+            double[,]? a = cnvArrayDouble2(args[0]);
+            if (a == null) return new Token("", TokenType.ERROR);
+            double[,]? b = cnvArrayDouble2(args[1]);
+            if (b == null) return new Token("", TokenType.ERROR);
+            //  行列演算
+            double[,] c = ylib.matrixAdd(a, b);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 逆行列 A^-1 (ある行列で線形変換した空間を元に戻す行列)
+        /// </summary>
+        /// <param name="args">引数(行列A)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token matrixInverse(List<Token> args, Token ret)
+        {
+            //  2D配列を実数配列に変換
+            double[,]? a = cnvArrayDouble2(args[0]);
+            if (a == null) return new Token("", TokenType.ERROR);
+            //  行列演算
+            double[,] c = ylib.matrixInverse(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+        /// <summary>
+        /// 行列のコピー(inner function)
+        /// </summary>
+        /// <param name="args">引数(行列A)</param>
+        /// <param name="ret">戻り変数</param>
+        /// <returns>戻り変数</returns>
+        private Token matrixCopy(List<Token> args, Token ret)
+        {
+            //  2D配列を実数配列に変換
+            double[,]? a = cnvArrayDouble2(args[0]);
+            if (a == null) return new Token("", TokenType.ERROR);
+            //  行列演算
+            double[,] c = ylib.copyMatrix(a);
+            //  戻り値の設定
+            setReturnArray(c, ret);
+            mScript.mParse.setVariable(new Token("return", TokenType.VARIABLE), ret);
+            return mScript.mParse.mVariables["return"];
+        }
+
+
+        /// <summary>
         /// 配列データを実数のリストに変換
         /// </summary>
         /// <param name="arg">配列名</param>
@@ -443,7 +726,7 @@ namespace KScript
             List<double> listData = new List<double>();
             string arrayName = getSearchName(arg);
             foreach (var variable in mVariables) {
-                if (0 <= variable.Key.IndexOf(arrayName)) {
+                if (0 == variable.Key.IndexOf(arrayName)) {
                     if (variable.Value.mType != TokenType.STRING)
                         listData.Add(ylib.doubleParse(variable.Value.mValue));
                 }
@@ -461,9 +744,9 @@ namespace KScript
             List<string> listData = new List<string>();
             string arrayName = getSearchName(arg);
             foreach (var variable in mVariables) {
-                if (0 <= variable.Key.IndexOf(arrayName)) {
+                if (0 == variable.Key.IndexOf(arrayName)) {
                     if (variable.Value.mType == TokenType.STRING)
-                        listData.Add(variable.Value.mValue);
+                        listData.Add(variable.Value.getValue());
                 }
             }
             return listData;
@@ -486,131 +769,6 @@ namespace KScript
             else
                 arrayName = arg.mValue;
             return arrayName;
-        }
-
-        /// <summary>
-        /// Windowsコマンド実行
-        /// </summary>
-        /// <param name="args"></param>
-        private void cmd(Token args)
-        {
-            ylib.openUrl(args.mValue);
-        }
-
-        /// <summary>
-        /// 単位行列の作成(n x n)
-        /// </summary>
-        /// <param name="size">行列の大きさ</param>
-        /// <param name="ret">戻り変数</param>
-        /// <returns>戻り変数</returns>
-        private Token unitMatrix(Token size, Token ret)
-        {
-            double[,] matrix = ylib.unitMatrix(ylib.intParse(size.mValue));
-
-            //  戻り値の設定
-            setReturnArray(matrix, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
-        }
-
-        /// <summary>
-        /// 転置行列  行列Aの転置A^T
-        /// </summary>
-        /// <param name="args">引数(行列 A</param>
-        /// <param name="ret"></param>
-        /// <returns></returns>
-        private Token matrixTranspose(Token args, Token ret)
-        {
-            //  2D配列を実数配列に変換
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            double[,]? a = cnvArrayDouble2(new Token(listArg[0], TokenType.ARRAY));
-            //  行列演算
-            double[,] c = ylib.matrixTranspose(a);
-            //  戻り値の設定
-            setReturnArray(c, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
-        }
-
-        /// <summary>
-        /// 行列の積  AxB
-        /// 行列の積では 結合の法則  (AxB)xC = Ax(BxC) , 分配の法則 (A+B)xC = AxC+BxC , Cx(A+B) = CxA + CxB　が可
-        /// 交換の法則は成立しない  AxB ≠ BxA
-        /// </summary>
-        /// <param name="args">引数(行列A,行列B)</param>
-        /// <param name="ret">戻り変数</param>
-        /// <returns>戻り変数</returns>
-        private Token matrixMulti(Token args, Token ret)
-        {
-            //  2D配列を実数配列に変換
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            double[,]? a = cnvArrayDouble2(new Token(listArg[0], TokenType.ARRAY));
-            double[,]? b = cnvArrayDouble2(new Token(listArg[1], TokenType.ARRAY));
-            //  行列演算
-            double[,] c = ylib.matrixMulti(a, b);
-            //  戻り値の設定
-            setReturnArray(c, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
-        }
-
-        /// <summary>
-        /// 行列の和 A+B
-        /// 異なるサイズの行列はゼロ行列にする
-        /// </summary>
-        /// <param name="args">引数(行列A,行列B)</param>
-        /// <param name="ret">戻り変数</param>
-        /// <returns>戻り変数</returns>
-        private Token matrixAdd(Token args, Token ret)
-        {
-            //  2D配列を実数配列に変換
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            double[,]? a = cnvArrayDouble2(new Token(listArg[0], TokenType.ARRAY));
-            double[,]? b = cnvArrayDouble2(new Token(listArg[1], TokenType.ARRAY));
-            //  行列演算
-            double[,] c = ylib.matrixAdd(a, b);
-            //  戻り値の設定
-            setReturnArray(c, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
-        }
-
-        /// <summary>
-        /// 逆行列 A^-1 (ある行列で線形変換した空間を元に戻す行列)
-        /// </summary>
-        /// <param name="args">引数(行列A)</param>
-        /// <param name="ret">戻り変数</param>
-        /// <returns>戻り変数</returns>
-        private Token matrixInverse(Token args, Token ret)
-        {
-            //  2D配列を実数配列に変換
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            double[,]? a = cnvArrayDouble2(new Token(listArg[0], TokenType.ARRAY));
-            //  行列演算
-            double[,] c = ylib.matrixInverse(a);
-            //  戻り値の設定
-            setReturnArray(c, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
-        }
-
-        /// <summary>
-        /// 行列のコピー
-        /// </summary>
-        /// <param name="args">引数(行列A)</param>
-        /// <param name="ret">戻り変数</param>
-        /// <returns>戻り変数</returns>
-        private Token copyMatrix(Token args, Token ret)
-        {
-            //  2D配列を実数配列に変換
-            List<string> listArg = mLexer.commaSplit(args.mValue);
-            double[,]? a = cnvArrayDouble2(new Token(listArg[0], TokenType.ARRAY));
-            //  行列演算
-            double[,] c = ylib.copyMatrix(a);
-            //  戻り値の設定
-            setReturnArray(c, ret);
-            mScript.mParse.addVariable(new Token("return", TokenType.VARIABLE), ret);
-            return mScript.mParse.mVariables["return"];
         }
 
         /// <summary>
@@ -731,7 +889,7 @@ namespace KScript
             string destName = dest.mValue.Substring(0, dp);
             for (int i = 0; i < src.Length; i++) {
                 Token key = new Token($"{destName}[{i}]", TokenType.VARIABLE);
-                mScript.mParse.addVariable(key, src[i].copy());
+                mScript.mParse.setVariable(key, src[i].copy());
             }
         }
 
@@ -749,7 +907,7 @@ namespace KScript
             for (int i = 0; i < src.GetLength(0); i++) {
                 for (int j = 0; j < src.GetLength(1); j++) {
                     Token key = new Token($"{destName}[{i},{j}]", TokenType.VARIABLE);
-                    mScript.mParse.addVariable(key, new Token(src[i, j].ToString(), TokenType.LITERAL));
+                    mScript.mParse.setVariable(key, new Token(src[i, j].ToString(), TokenType.LITERAL));
                 }
             }
         }
@@ -767,7 +925,7 @@ namespace KScript
             string destName = dest.mValue.Substring(0, dp);
             for (int i = 0; i < src.Length; i++) {
                 Token key = new Token($"{destName}[{i}]", TokenType.VARIABLE);
-                mScript.mParse.addVariable(key, new Token(src[i].ToString(), TokenType.LITERAL));
+                mScript.mParse.setVariable(key, new Token(src[i].ToString(), TokenType.LITERAL));
             }
         }
 
@@ -784,7 +942,7 @@ namespace KScript
             string destName = dest.mValue.Substring(0, dp);
             for (int i = 0; i < src.Length; i++) {
                 Token key = new Token($"{destName}[{i}]", TokenType.VARIABLE);
-                mScript.mParse.addVariable(key, new Token(src[i].ToString(), TokenType.LITERAL));
+                mScript.mParse.setVariable(key, new Token(src[i].ToString(), TokenType.LITERAL));
             }
         }
 
@@ -839,40 +997,6 @@ namespace KScript
             else if (0 < sp)
                 arrayName = args.mValue.Substring(0, sp);
             return (arrayName, dimNo);
-        }
-
-        /// <summary>
-        /// 引数の変数または配列変数を数値に変換
-        /// m + 2 →  3 + 2 → 5
-        /// a[m, n+1] → a[2,3+1] → a[2,4] → 5
-        /// </summary>
-        /// <param name="value">変数または配列変数</param>
-        /// <returns>数値</returns>
-        public Token getValueToken(string value)
-        {
-            string buf = "";
-            int sp = value.IndexOf("[");
-            if (0 <= sp) {
-                //  配列引数
-                List<Token> tokens = mLexer.splitArgList(value);
-                buf = tokens[0].mValue;
-                for (int i = 1; i < tokens.Count; i++) {
-                    if (tokens[i].mType == TokenType.VARIABLE ||
-                        tokens[i].mType == TokenType.EXPRESS) {
-                        buf += mScript.express(tokens[i]).mValue;
-                    } else {
-                        buf += tokens[i].mValue;
-                    }
-                }
-            } else {
-                //  通常の引数
-                buf = mScript.express(mLexer.string2Token(value)).mValue.Trim();
-            }
-
-            if (mVariables.ContainsKey(buf))
-                return mVariables[buf];
-            else
-                return new Token(buf, TokenType.LITERAL);
         }
     }
 }

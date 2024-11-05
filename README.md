@@ -89,6 +89,7 @@ Program :   テスト環境
         for (初期値; 条件; 増分) { 実行文; }
     break文  : ループの中断
     continue文   : ループの先頭に戻る
+    exit文   : プログラムの終了
 
 ### 関数の定義
     複数の文をまとめて実行する仕組み
@@ -138,12 +139,19 @@ Program :   テスト環境
     d[,] = matrixAdd(a[,], b[,]);   : 行列の和  
     d[,] = matrixInverse(a[,]);     : 逆行列 a^-1  
     d[,] = copyMatrix(a[,]);        : 行列のコピー  
+    dateTimeNow(type);              : 現在の時刻を文字列で取得  
+    startTime();                    : 時間計測の開始  
+    lapTime();                      : 経過時間の取得(秒)  
+    solveQuadraticEquation(a,b,c);  : 2次方程式の解  
+    solveCubicEquation(a,b,c,d);    : 3次方程式の解  
+    solveQuarticEquation(a,b,c,d,e);: 4次方程式の解  
 
 ### 数式処理 : CoreLib の YCalc.expression(式) を呼び出す
 
 
 
 ### 履歴
+2024/11/05 exit文の追加、時間関数,2次3次4次方程式の7関数追加  
 2024/09/26 統計陽関数追加  
 2024/09/21 #include文の追加  
 2024/09/20 ラインエディタを持ったテスト環境作成

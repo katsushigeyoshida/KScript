@@ -40,19 +40,53 @@ namespace KScript
         public static char[] skipChar = { ' ', '\t', '\r', '\n' };
         public static string[] statement = {
             "let", "while", "if", "else", "for", "return", "break", "continue",
-            "print", "println", "using", "#include",
+            "print", "println", "exit", "#include",
         };
         public static string[] constatnt = { "PI", "E" };
+        public char[] mBrackets = { '(', ')', '{', '}', '[', ']', '\"', '\"' };
 
         public string mValue;
         public TokenType mType;
 
+        private KLexer mLexer = new KLexer();
+
+        /// <summary>
+        /// コンストラクタ(データの種別は自動判定)
+        /// </summary>
+        /// <param name="value">データ</param>
+        public Token(string value)
+        {
+            mValue = value;
+            mType = getTokenType(value);
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="value">データ</param>
+        /// <param name="type">種別</param>
         public Token(string value, TokenType type)
         {
             mValue = value;     //  データの値
             mType = type;       //  データの種類
         }
 
+        /// <summary>
+        /// STRING データを取得するとき'"'の囲みを外す
+        /// </summary>
+        /// <returns>値</returns>
+        public string getValue()
+        {
+            if (mType == TokenType.STRING)
+                return mLexer.stripBracketString(mValue, '"');
+            else
+                return mValue;
+        }
+
+        /// <summary>
+        /// コピーを作成
+        /// </summary>
+        /// <returns></returns>
         public Token copy()
         {
             return new Token(mValue, mType);
@@ -62,7 +96,25 @@ namespace KScript
         {
             return $"{mValue}[{mType.ToString()}]";
         }
+
+
+        /// <summary>
+        /// 文字列からデータの種類を求める
+        /// </summary>
+        /// <param name="str">文字列</param>
+        /// <returns>種別</returns>
+        public TokenType getTokenType(string str)
+        {
+            List<Token> tokens = mLexer.tokenList(str);
+            if (1 < tokens.Count)
+                return TokenType.EXPRESS;
+            else if (1 == tokens.Count)
+                return tokens[0].mType;
+            else
+                return TokenType.ERROR;
+        }
     }
+
 
     /// <summary>
     /// 字句解析
@@ -128,10 +180,9 @@ namespace KScript
                 } else if (Char.IsLetter(str[i]) || str[i] == '#') { //  アルファベットの確認(a-z,A-Z,全角も)
                     //  変数名、予約語
                     while (i < str.Length && Array.IndexOf(Token.operators, str[i]) < 0
-                             && Array.IndexOf(Token.delimiter, str[i]) < 0) {
-                        if (Array.IndexOf(Token.skipChar, str[i]) < 0)
-                            buf += str[i];
-                        i++;
+                             && Array.IndexOf(Token.delimiter, str[i]) < 0
+                             && Array.IndexOf(Token.skipChar, str[i]) < 0) {
+                        buf += str[i++];
                     }
                     while (i < str.Length && str[i] == ' ') i++;    //  空白削除
                     if (Token.statement.Contains(buf)) {
@@ -174,8 +225,7 @@ namespace KScript
                     //  文字列
                     buf = getBracketString(str, i, str[i]);
                     i += buf.Length - 1;
-                    buf = stripBracketString(buf, str[i]);
-                    buf = buf.Replace("\\n", "\n");
+                     buf = buf.Replace("\\n", "\n");
                     tokens.Add(new Token(buf, TokenType.STRING));
                 } else if (0 <= Array.IndexOf(Token.operators, str[i])) {
                     //  識別子(演算子/条件演算子)
@@ -259,6 +309,9 @@ namespace KScript
             int count = 1;
             pos++;
             while (pos < str.Length && 0 < count) {
+                if (bracket != '"' && str[pos] == '"') {
+                    while (pos + 1 < str.Length && str[++pos] != '"') ;
+                }
                 if (str[pos] == '\\') pos++;
                 else if (str[pos] == mBrackets[offset + 1]) count--;
                 else if (str[pos] == mBrackets[offset]) count++;
@@ -318,7 +371,7 @@ namespace KScript
                     } else {
                         while (n < str.Length && str[n] != mBrackets[offset + 1]) {
                             if (str[n++] == '"') {
-                                while (n < str.Length && str[n] != '"') n++;
+                                while (n < str.Length && str[n++] != '"') ;
                             }
                         }
                     }
@@ -330,6 +383,8 @@ namespace KScript
             }
             if (sp < n && n <= str.Length)
                 strings.Add(str.Substring(sp, n - sp));
+            if (0 < str.Length && str[str.Length - 1] == ',')
+                strings.Add("");
             return strings;
         }
 
@@ -372,41 +427,6 @@ namespace KScript
             if (0 < buf.Length)
                 argList.Add(new Token(buf, TokenType.VARIABLE));
             return argList;
-        }
-
-        /// <summary>
-        /// 文字列をTokenに変換する
-        /// </summary>
-        /// <param name="str">文字列</param>
-        /// <returns>Token</returns>
-        public Token string2Token(string str)
-        {
-            if (0 <= str.IndexOf(','))
-                return new Token(str, TokenType.VARIABLE);
-            foreach (var func in YCalc.mKeyWord) {
-                if (1 < func.Length && 0 <= str.IndexOf(func))
-                    return new Token(str, TokenType.EXPRESS);
-            }
-            foreach (var ope in Token.operators) {
-                if (0 <= str.IndexOf(ope))
-                    return new Token(str, TokenType.EXPRESS);
-            }
-            foreach (var ope in Token.assignment) {
-                if (0 <= str.IndexOf(ope))
-                    return new Token(str, TokenType.EXPRESS);
-            }
-            foreach (var ope in Token.condition) {
-                if (0 <= str.IndexOf(ope))
-                    return new Token(str, TokenType.EXPRESS);
-            }
-            foreach (var ope in Token.statement) {
-                if (0 <= str.IndexOf(ope))
-                    return new Token(str, TokenType.STATEMENT);
-            }
-            if (0 <= str.IndexOf('('))
-                return new Token(str, TokenType.FUNCTION);
-
-            return new Token(str, TokenType.VARIABLE);
         }
     }
 }
